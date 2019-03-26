@@ -7,3 +7,7 @@ git:
 
 notifications:
     email: false
+
+install:
+  - cabal install alex
+  - export PATH=~/.cabal/bin:${PATH}
