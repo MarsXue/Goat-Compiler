@@ -11,3 +11,7 @@ notifications:
 install:
   - cabal install alex
   - export PATH=~/.cabal/bin:${PATH}
+
+script:
+  - make
+  - make clean
