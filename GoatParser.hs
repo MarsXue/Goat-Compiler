@@ -9,11 +9,7 @@ import System.Environment
 import System.Exit
 
 type Parser a 
-    = Parsec [Char] () a
-
-data Exp
-    = Num Float | Add Exp Exp | Mul Exp Exp
-    deriving (Show, Eq)
+    = Parsec String Int a
 
 lexer :: Q.TokenParser ()
 lexer
@@ -43,8 +39,8 @@ reservedOp = Q.reservedOp lexer
 myReserved, myOpnames :: [String]
 
 myReserved
-    =  ["begin", "bool", "do", "end", "false", "fi",
-        "float", "if", "int", "od", "proc", "read", 
+    =  ["begin", "bool", "do", "call", "end", "false", 
+        "fi", "float", "if", "int", "od", "proc", "read", 
         "ref", "then", "true", "val", "while", "write"]
 
 myOpnames 
@@ -88,13 +84,31 @@ pDecl
 
 pBaseType :: Parser basetype
 pBaseType
-    = lexeme (
-        try (do { reserved "bool"; return BoolType })
+    = lexeme (try 
+        (do { reserved "bool"; return BoolType })
         <|>
         try (do { reserved "int"; return IntType })
         <|>
         (do { reserved "float"; return FloatType })
     )
+
+pFloat :: Parser Exp
+pFloat 
+    = lexeme (try
+                (do { ws <- many1 digit
+                    ; char '.'
+                    ; ds <- many1 digit 
+                    ; let val = read (ws ++ ('.' : ds)) :: Float
+                    ; return (Num val)
+                    }
+                )
+                <|> 
+                (do { ws <- many1 digit
+                    ; let val = read ws :: Float
+                    ; return (Num val)
+                    }
+                )
+            )
 
 -----------------------------------------------------------------
 --  pStmt is the main parser for statements. It wants to recognise
@@ -136,3 +150,9 @@ pMulOp
     = do
         reservedOp "*"
         return Mul
+
+pUminus
+    = do
+        reservedOp "-"
+        exp <- pFactor
+        return (UnaryMinus exp)
