@@ -1,8 +1,7 @@
 proc        main (val int a, ref float b, val bool c)
-end
 
-proc main1 (val int a, ref float b, val bool c)
-end
+int   [   10   ,    9   ]   x   ;
 
-proc main2 (val int a, ref float b, val bool c)
+begin
+
 end
