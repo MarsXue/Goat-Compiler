@@ -1,4 +1,4 @@
-module GoatParser where
+module Main where
 
 import GoatAST
 import Data.Char
@@ -9,11 +9,11 @@ import System.Environment
 import System.Exit
 
 type Parser a 
-    = Parsec String Int a
+  = Parsec String () a
 
 lexer :: Q.TokenParser ()
 lexer
-    = Q.makeTokenParser
+  = Q.makeTokenParser
     (emptyDef
     { Q.commentLine     = "#"
     , Q.nestedComments  = True
@@ -39,33 +39,53 @@ reservedOp = Q.reservedOp lexer
 myReserved, myOpnames :: [String]
 
 myReserved
-  = [ "begin", "bool", "do", "call", "end", "false", 
-      "fi", "float", "if", "int", "od", "proc", "read", 
-      "ref", "then", "true", "val", "while", "write" ]
+  = [ "begin", "bool", "do", "call", "end", "false", "fi", 
+      "float", "if", "int", "od", "proc", "read", "ref", 
+      "then", "true", "val", "while", "write", "[", "]" ]
 
 myOpnames 
-  = [ "+", "-", "*", "/" ":=", "||", "&&", 
+  = [ "+", "-", "*", "/", ":=", "||", "&&", 
       "=", "!=", "<", "<=", ">", ">=", "!" ]
 
------------------------------------------------------------------
---  pProg is the topmost parsing function. It looks for a program
---  header "proc main()", followed by the program body.
------------------------------------------------------------------
 pProg :: Parser GoatProgram
-pProg
+pProg 
+  = do 
+    procs <- many1 pProc 
+    return (Program procs)
+
+pProc :: Parser Procedure
+pProc
   = do
     reserved "proc"
-    reserved "main"
-    parens (return ())
-    (decls, stmts) <- pProgBody
-    return (Program decls stmts)
+    header <- pHeader
+    (decls, stmts) <- pProcBody
+    return (Procedure header decls stmts)
 
------------------------------------------------------------------
---  pProgBody looks for a sequence of declarations followed by a
---  sequence of statements.
------------------------------------------------------------------
-pProgBody :: Parser ([Decl], [Stmt])
-pProgBody
+pHeader :: Parser Header
+pHeader
+  = do
+    ident <- identifier
+    params <- parens (pParameter `sepBy` comma)
+    return (Header ident params)
+
+pParameter :: Parser Parameter
+pParameter
+  = do
+    ind <- pIndicator
+    t <- pBaseType
+    ident <- identifier
+    return (Parameter ind t ident)
+
+pIndicator :: Parser Indicator
+pIndicator
+  = lexeme (
+      try (do { reserved "val"; return Val })
+      <|>
+      (do { reserved "ref"; return Ref })
+    )
+
+pProcBody :: Parser ([Decl], [Stmt])
+pProcBody
   = do
     decls <- many pDecl
     reserved "begin"
@@ -76,13 +96,46 @@ pProgBody
 pDecl :: Parser Decl
 pDecl
   = do
-    basetype <- pBaseType
+    vtype <- pVarType
     ident <- identifier
     whiteSpace
     semi
-    return (Decl ident basetype)
+    return (Decl vtype ident)
 
-pBaseType :: Parser basetype
+pVarType :: Parser VarType
+pVarType
+  = lexeme(
+    do 
+    b <- pBaseType
+    try (
+      s <- pShape
+      return (DVarType b s)
+    )
+    <|>
+    return (SVarType b)
+  )
+
+pShape :: Parser Shape
+pShape 
+  = lexeme (
+    try (do 
+      { reserved "["
+      ; int <- pInt
+      ; reserved "]"
+      ; reserved "["
+      ; int2 <- pInt
+      ; reserved "]"
+      ; return (DShape int int2)})
+    <|>
+      (do 
+      { reserved "["
+      ; int <- pInt
+      ; reserved "]"
+      ; return (SShape int)
+      })  
+  )
+
+pBaseType :: Parser BaseType
 pBaseType
   = lexeme (
       try (do { reserved "bool"; return BoolType })
@@ -92,67 +145,110 @@ pBaseType
       (do { reserved "float"; return FloatType })
     )
 
-pFloat :: Parser Exp
-pFloat 
-  = lexeme (
-      try (do { ws <- many1 digit
-              ; char '.'
-              ; ds <- many1 digit 
-              ; let val = read (ws ++ ('.' : ds)) :: Float
-              ; return (Num val)
-          }
-      )
-          <|> 
-          (do { ws <- many1 digit
-              ; let val = read ws :: Float
-              ; return (Num val)
-          }
-      )
-    )
+pInt :: Parser Expr
+pInt
+= do
+    n <- natural <?> ""
+    return (IntConst (fromInteger n :: Int))
+  <?>
+  "integer"
 
------------------------------------------------------------------
---  pStmt is the main parser for statements. It wants to recognise
---  read and write statements, and assignments.
------------------------------------------------------------------
-pStmt, pRead, pWrite, pAsg :: Parser Stmt
+-- pFloat :: Parser Expr
+-- pFloat 
+--   = lexeme (
+--       try (do { ws <- many1 digit
+--               ; char '.'
+--               ; ds <- many1 digit 
+--               ; let val = read (ws ++ ('.' : ds)) :: Float
+--               ; return (Num val)
+--           }
+--       )
+--           <|> 
+--           (do { ws <- many1 digit
+--               ; let val = read ws :: Float
+--               ; return (Num val)
+--           }
+--       )
+--     )
 
-pStmt 
-  = choice [pRead, pWrite, pAsg]
+-- -----------------------------------------------------------------
+-- --  pStmt is the main parser for statements. It wants to recognise
+-- --  read and write statements, and assignments.
+-- -----------------------------------------------------------------
+-- pStmt, pRead, pWrite, pAsg :: Parser Stmt
 
-pRead
+-- pStmt 
+--   = choice [pRead, pWrite, pAsg]
+
+-- pRead
+--   = do
+--     reserved "read"
+--     lvalue <- pLvalue
+--     semi
+--     return (Read lvalue)
+
+-- pWrite
+--   = do
+--     reserved "write"
+--     exp <- (pString <|> pExp)
+--     semi
+--     return (Write exp)
+
+-- pAsg
+--   = do
+--     lvalue <- pLvalue
+--     reservedOp ":="
+--     rvalue <- pExp
+--     semi
+--     return (Assign lvalue rvalue)
+
+-- pAddOp, pMulOp :: Parser (Expr -> Expr -> Expr)
+
+-- pAddOp
+--   = do
+--     reservedOp "+"
+--     return Add
+
+-- pMulOp
+--   = do
+--     reservedOp "*"
+--     return Mul
+
+-- pUminus
+--   = do
+--     reservedOp "-"
+--     exp <- pFactor
+--     return (UnaryMinus exp)
+
+pMain :: Parser GoatProgram
+pMain
   = do
-    reserved "read"
-    lvalue <- pLvalue
-    semi
-    return (Read lvalue)
+      whiteSpace
+      p <- pProg
+      eof
+      return p
 
-pWrite
-  = do
-    reserved "write"
-    exp <- (pString <|> pExp)
+main :: IO ()
+main
+  = do 
+    { progname <- getProgName
+    ; args <- getArgs
+    ; checkArgs progname args
+    ; input <- readFile (head args)
+    ; let output = runParser pMain () "" input
+    ; case output of
+        Right ast -> print ast
+        Left  err -> do { putStr "Parse error at "
+                        ; print err
+                        }
+    }
 
-pAsg
-  = do
-    lvalue <- pLvalue
-    reservedOp ":="
-    rvalue <- pExp
-    semi
-    return (Assign lvalue rvalue)
+checkArgs :: String -> [String] -> IO ()
+checkArgs _ [filename]
+  = return ()
+checkArgs progname _
+  = do 
+    { putStrLn ("Usage: " ++ progname ++ " filename\n\n")
+    ; exitWith (ExitFailure 1)
+    }
 
-pAddOp, pMulOp :: Parser (Expr -> Expr -> Expr)
-
-pAddOp
-  = do
-    reservedOp "+"
-    return Add
-
-pMulOp
-  = do
-    reservedOp "*"
-    return Mul
-
-pUminus
-  = do
-    reservedOp "-"
-    exp <- pFactor
-    return (UnaryMinus exp)
