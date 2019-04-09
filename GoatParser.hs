@@ -9,11 +9,7 @@ import System.Environment
 import System.Exit
 
 type Parser a 
-    = Parsec [Char] () a
-
-data Exp
-    = Num Float | Add Exp Exp | Mul Exp Exp
-    deriving (Show, Eq)
+    = Parsec String Int a
 
 lexer :: Q.TokenParser ()
 lexer
@@ -43,13 +39,13 @@ reservedOp = Q.reservedOp lexer
 myReserved, myOpnames :: [String]
 
 myReserved
-    =  ["begin", "bool", "do", "end", "false", "fi",
-        "float", "if", "int", "od", "proc", "read", 
-        "ref", "then", "true", "val", "while", "write"]
+  = [ "begin", "bool", "do", "call", "end", "false", 
+      "fi", "float", "if", "int", "od", "proc", "read", 
+      "ref", "then", "true", "val", "while", "write" ]
 
 myOpnames 
-    =  ["+", "-", "*", "/" ":=", "||", "&&", 
-        "=", "!=", "<", "<=", ">", ">=", "!"]
+  = [ "+", "-", "*", "/" ":=", "||", "&&", 
+      "=", "!=", "<", "<=", ">", ">=", "!" ]
 
 -----------------------------------------------------------------
 --  pProg is the topmost parsing function. It looks for a program
@@ -57,12 +53,12 @@ myOpnames
 -----------------------------------------------------------------
 pProg :: Parser GoatProgram
 pProg
-    = do
-        reserved "proc"
-        reserved "main"
-        parens (return ())
-        (decls, stmts) <- pProgBody
-        return (Program decls stmts)
+  = do
+    reserved "proc"
+    reserved "main"
+    parens (return ())
+    (decls, stmts) <- pProgBody
+    return (Program decls stmts)
 
 -----------------------------------------------------------------
 --  pProgBody looks for a sequence of declarations followed by a
@@ -70,30 +66,48 @@ pProg
 -----------------------------------------------------------------
 pProgBody :: Parser ([Decl], [Stmt])
 pProgBody
-    = do
-        decls <- many pDecl
-        reserved "begin"
-        stmts <- many1 pStmt
-        reserved "end"
-        return (decls, stmts)
+  = do
+    decls <- many pDecl
+    reserved "begin"
+    stmts <- many1 pStmt
+    reserved "end"
+    return (decls, stmts)
 
 pDecl :: Parser Decl
 pDecl
-    = do
-        basetype <- pBaseType
-        ident <- identifier
-        whiteSpace
-        semi
-        return (Decl ident basetype)
+  = do
+    basetype <- pBaseType
+    ident <- identifier
+    whiteSpace
+    semi
+    return (Decl ident basetype)
 
 pBaseType :: Parser basetype
 pBaseType
-    = lexeme (
-        try (do { reserved "bool"; return BoolType })
-        <|>
-        try (do { reserved "int"; return IntType })
-        <|>
-        (do { reserved "float"; return FloatType })
+  = lexeme (
+      try (do { reserved "bool"; return BoolType })
+      <|>
+      try (do { reserved "int"; return IntType })
+      <|>
+      (do { reserved "float"; return FloatType })
+    )
+
+pFloat :: Parser Exp
+pFloat 
+  = lexeme (
+      try (do { ws <- many1 digit
+              ; char '.'
+              ; ds <- many1 digit 
+              ; let val = read (ws ++ ('.' : ds)) :: Float
+              ; return (Num val)
+          }
+      )
+          <|> 
+          (do { ws <- many1 digit
+              ; let val = read ws :: Float
+              ; return (Num val)
+          }
+      )
     )
 
 -----------------------------------------------------------------
@@ -103,36 +117,42 @@ pBaseType
 pStmt, pRead, pWrite, pAsg :: Parser Stmt
 
 pStmt 
-    = choice [pRead, pWrite, pAsg]
+  = choice [pRead, pWrite, pAsg]
 
 pRead
-    = do
-        reserved "read"
-        lvalue <- pLvalue
-        semi
-        return (Read lvalue)
+  = do
+    reserved "read"
+    lvalue <- pLvalue
+    semi
+    return (Read lvalue)
 
 pWrite
-    = do
-        reserved "write"
-        exp <- (pString <|> pExp)
+  = do
+    reserved "write"
+    exp <- (pString <|> pExp)
 
 pAsg
-    = do
-        lvalue <- pLvalue
-        reservedOp ":="
-        rvalue <- pExp
-        semi
-        return (Assign lvalue rvalue)
+  = do
+    lvalue <- pLvalue
+    reservedOp ":="
+    rvalue <- pExp
+    semi
+    return (Assign lvalue rvalue)
 
 pAddOp, pMulOp :: Parser (Expr -> Expr -> Expr)
 
 pAddOp
-    = do
-        reservedOp "+"
-        return Add
+  = do
+    reservedOp "+"
+    return Add
 
 pMulOp
-    = do
-        reservedOp "*"
-        return Mul
+  = do
+    reservedOp "*"
+    return Mul
+
+pUminus
+  = do
+    reservedOp "-"
+    exp <- pFactor
+    return (UnaryMinus exp)
