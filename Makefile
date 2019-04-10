@@ -7,6 +7,7 @@ GoatParser: GoatParser.hs GoatAST.hs
 
 test:
 	./GoatParser GoatTest/a.gt
+	# ./GoatParser sample.gt
 
 clean:
 	rm -f *.o *.hi

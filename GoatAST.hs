@@ -24,9 +24,10 @@ data Index
   | DIndex Expr Expr
   deriving (Show, Eq)
 
-data VarType
-  = SVarType BaseType 
-  | DVarType BaseType Shape
+data Var
+  = BaseVar Ident
+  | ShapeVar Ident Shape
+  | IndexVar Ident Index
   deriving (Show, Eq)
 
 data LValue
@@ -34,54 +35,38 @@ data LValue
   | DLVal Ident Index
   deriving (Show, Eq)
 
-data Binop
-  = Add 
-  | Minus 
-  | Mul 
-  | Div 
-  | Or 
-  | And 
-  | Equal 
-  | NotEqual 
-  | Less 
-  | LessEqual 
-  | Greater 
-  | GreaterEqual
-  deriving (Show, Eq)
-
-data Unop
-  = Neg | UMinus
-  deriving (Show, Eq)
-
 data Expr
-  = SId Ident
-  | DId Ident Index
+  = Id Var
   | BoolConst Bool
   | IntConst Int
   | FloatConst Float
   | StrConst String
-  | Binop Expr Expr
-  | Unop Expr
+  | Add Expr Expr
+  | Minus Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  | Or Expr Expr
+  | And Expr Expr
+  | Equal Expr Expr
+  | NotEqual Expr Expr
+  | Less Expr Expr
+  | LessEqual Expr Expr
+  | Greater Expr Expr
+  | GreaterEqual Expr Expr
+  | Neg Expr
+  | UMinus Expr
   deriving (Show, Eq)
 
 data Decl
-  = Decl VarType Ident
+  = Decl BaseType Var
   deriving (Show, Eq)
 
 data Stmt
-  = AStmt
-  | CStmt
-  deriving (Show, Eq)
-
-data AStmt
   = Assign LValue Expr
   | Read LValue
   | Write Expr
   | Call Ident [Expr]
-  deriving (Show, Eq)
-
-data CStmt
-  = If Expr [Stmt] 
+  | If Expr [Stmt] 
   | IfElse Expr [Stmt] [Stmt]
   | While Expr [Stmt]
   deriving (Show, Eq)
