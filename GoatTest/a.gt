@@ -1,6 +1,9 @@
 proc        main (val int a, ref float b, val bool c)
 
-int   [   10   ,    9   ]   x   ;
+int   x  [   10   ,    9   ]      ;
+int n;
+float y;
+bool a[8];
 
 begin
 
