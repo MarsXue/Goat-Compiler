@@ -19,9 +19,9 @@ data Shape
   | DShape Int Int
   deriving (Show, Eq)
 
-data Idx
-  = SIdx Expr
-  | DIdx Expr Expr
+data Index
+  = SIndex Expr
+  | DIndex Expr Expr
   deriving (Show, Eq)
 
 data VarType
@@ -31,7 +31,7 @@ data VarType
 
 data LValue
   = SLVal Ident 
-  | DLVal Ident Idx
+  | DLVal Ident Index
   deriving (Show, Eq)
 
 data Binop
@@ -55,7 +55,7 @@ data Unop
 
 data Expr
   = SId Ident
-  | DId Ident Idx
+  | DId Ident Index
   | BoolConst Bool
   | IntConst Int
   | FloatConst Float
