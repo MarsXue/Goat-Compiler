@@ -90,9 +90,9 @@ pProcBody
   = do
     decls <- many pDecl
     reserved "begin"
-    -- stmts <- many1 pStmt
+    stmts <- many1 pStmt
     reserved "end"
-    return (decls, [])
+    return (decls, stmts)
 
 pDecl :: Parser Decl
 pDecl
@@ -222,18 +222,9 @@ pWhile
 
 pLValue :: Parser LValue
 pLValue
-  = lexeme (
-    try ( do
-        { ident <- identifier
-        ; index <- pIndex
-        ; return (DLVal ident index)
-        })
-      <|>
-        ( do
-        { ident <- identifier
-        ; return (SLVal ident)
-        })
-    )
+  = do
+      v <- pVar
+      return (LValue v)
 
 pIndex :: Parser Index
 pIndex = brackets (

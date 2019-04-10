@@ -6,5 +6,5 @@ float y;
 bool a[8];
 
 begin
-
+a := 2 * (1 + 10) + 2 + 2 * 2 + 14;
 end

@@ -31,8 +31,7 @@ data Var
   deriving (Show, Eq)
 
 data LValue
-  = SLVal Ident 
-  | DLVal Ident Index
+  = LValue Var
   deriving (Show, Eq)
 
 data Expr
