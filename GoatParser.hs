@@ -40,9 +40,9 @@ brackets   = Q.brackets lexer
 myReserved, myOpnames :: [String]
 
 myReserved
-  = [ "begin", "bool", "do", "call", "end", "false", "fi",
-      "float", "if", "int", "od", "proc", "read", "ref",
-      "then", "true", "val", "while", "write"]
+  = [ "begin", "bool", "do", "call", "else", "end", "false",
+      "fi", "float", "if", "int", "od", "proc", "read",
+      "ref", "then", "true", "val", "while", "write"]
 
 myOpnames
   = [ "+", "-", "*", "/", ":=", "||", "&&",
@@ -80,9 +80,15 @@ pParameter
 pIndicator :: Parser Indicator
 pIndicator
   = lexeme (
-      try (do { reserved "val"; return Val })
-      <|>
-      (do { reserved "ref"; return Ref })
+    try ( do 
+      { reserved "val"
+      ; return Val 
+      })
+    <|>
+    ( do 
+      { reserved "ref"
+      ; return Ref 
+      })
     )
 
 pProcBody :: Parser ([Decl], [Stmt])
@@ -126,7 +132,7 @@ pVar
 
 pShape :: Parser Shape
 pShape =
-    brackets (
+  brackets (
     try ( do
         { n1 <- natural
         ; lexeme (char ',')
@@ -138,16 +144,25 @@ pShape =
         { n <- natural
         ; return (SShape (fromInteger n :: Int))
         })
-    )
+  )
 
 pBaseType :: Parser BaseType
 pBaseType
   = lexeme (
-      try (do { reserved "bool"; return BoolType })
+      try ( do 
+          { reserved "bool"
+          ; return BoolType 
+          })
       <|>
-      try (do { reserved "int"; return IntType })
+      try ( do 
+          { reserved "int"
+          ; return IntType 
+          })
       <|>
-      (do { reserved "float"; return FloatType })
+      ( do 
+        { reserved "float"
+        ; return FloatType 
+        })
     )
 
 -- -----------------------------------------------------------------
@@ -187,21 +202,22 @@ pCall
   = do
     reserved "call"
     ident <- identifier
-    exprs <- parens (many pExpr)
+    exprs <- parens (pExpr `sepBy` comma)
     semi
     return (Call ident exprs)
 
 pIf
-  = do
+  = try ( do
     reserved "if"
     expr <- pExpr
     reserved "then"
     stmts <- many1 pStmt
     reserved "fi"
     return (If expr stmts)
+  )
 
 pIfElse
-  = do
+  = try ( do
     reserved "if"
     expr <- pExpr
     reserved "then"
@@ -210,6 +226,7 @@ pIfElse
     elsms <- many1 pStmt
     reserved "fi"
     return (IfElse expr thsms elsms)
+  )
 
 pWhile
   = do
@@ -223,8 +240,8 @@ pWhile
 pLValue :: Parser LValue
 pLValue
   = do
-      v <- pVar
-      return (LValue v)
+    v <- pVar
+    return (LValue v)
 
 pIndex :: Parser Index
 pIndex = brackets (
@@ -244,8 +261,8 @@ pIndex = brackets (
 pIdent :: Parser Expr
 pIdent
   = do
-      v <- pVar
-      return (Id v)
+    v <- pVar
+    return (Id v)
 
 pConst :: Parser Expr
 pConst
@@ -255,21 +272,21 @@ pBool, pString, pInt, pFloat :: Parser Expr
 
 pBool
   = do
-      { reserved "true"
-      ; return (BoolConst True)
+    { reserved "true"
+    ; return (BoolConst True)
     }
     <|>
     do
-      { reserved "false"
-      ; return (BoolConst False)
-    }
+    { reserved "false"
+    ; return (BoolConst False)
+  }
 
 pString 
   = do
-      char '"'
-      str <- many (satisfy (/= '"'))
-      char '"'
-      return (StrConst str)
+    char '"'
+    str <- many (satisfy (/= '"'))
+    char '"'
+    return (StrConst str)
 
 pInt
   = do
@@ -281,19 +298,19 @@ pInt
 
 pFloat
   = lexeme (
-      try (do { ws <- many1 digit
-              ; char '.'
-              ; ds <- many1 digit
-              ; let val = read (ws ++ ('.' : ds)) :: Float
-              ; return (FloatConst val)
-          }
-      )
-          <|>
-          (do { ws <- many1 digit
-              ; let val = read ws :: Float
-              ; return (FloatConst val)
-          }
-      )
+    try ( do 
+        { ws <- many1 digit
+        ; char '.'
+        ; ds <- many1 digit
+        ; let val = read (ws ++ ('.' : ds)) :: Float
+        ; return (FloatConst val)
+        })
+        <|>
+        ( do 
+        { ws <- many1 digit
+        ; let val = read ws :: Float
+        ; return (FloatConst val)
+        })
     )
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
@@ -306,14 +323,15 @@ pOrExpr
 
 pAndExpr
   -- = chainl1 pNegExpr pNegOp
-  = try (do
-    { reservedOp "!"
-    ; expr <- pNegExpr
-    ; return (Neg expr)
-    })
+  = try ( do
+        { reservedOp "!"
+        ; expr <- pNegExpr
+        ; return (Neg expr)
+        })
     <|>
     do
-    { pNegExpr }
+    { pNegExpr 
+    }
 
 pNegExpr
   = chainl1 pComExpr pComOp
@@ -327,13 +345,14 @@ pTerm
 pFactor
   -- = chainl1 pBaseExpr pUminusOp
   = try (do 
-      { reservedOp "-"
-      ; expr <- pFactor
-      ; return (UMinus expr)
-      })
+        { reservedOp "-"
+        ; expr <- pFactor
+        ; return (UMinus expr)
+        })
     <|>
     do
-    { pBaseExpr }
+    { pBaseExpr
+    }
 
 pBaseExpr
   = choice [parens pExpr, pIdent, pConst]
@@ -341,13 +360,13 @@ pBaseExpr
 pOrOp, pAndOp, pComOp :: Parser (Expr -> Expr -> Expr)
 pOrOp
   = do
-      reservedOp "||"
-      return Or
+    reservedOp "||"
+    return Or
 
 pAndOp
   = do
-      reservedOp "&&"
-      return And
+    reservedOp "&&"
+    return And
 
 pComOp 
   = choice [pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp, pGreaterOp, pGreaterEqualOp]
@@ -362,33 +381,33 @@ pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp, pGreaterOp, pGreaterEqualOp :: Par
 
 pEqualOp
   = do
-      reservedOp "="
-      return Equal
+    reservedOp "="
+    return Equal
 
 pNotEqualOp
   = do
-      reservedOp "!="
-      return NotEqual
+    reservedOp "!="
+    return NotEqual
 
 pLessOp
   = do
-      reservedOp "<"
-      return Less
+    reservedOp "<"
+    return Less
 
 pLessEqualOp
   = do
-      reservedOp "<="
-      return LessEqual
+    reservedOp "<="
+    return LessEqual
 
 pGreaterOp
   = do 
-      reservedOp ">"
-      return Greater
+    reservedOp ">"
+    return Greater
 
 pGreaterEqualOp
   = do
-      reservedOp ">="
-      return GreaterEqual
+    reservedOp ">="
+    return GreaterEqual
 
 pAddOp, pMinusOp, pMulOp, pDivOp :: Parser (Expr -> Expr -> Expr)
 
@@ -411,18 +430,6 @@ pDivOp
   = do
     reservedOp "/"
     return Div
-
--- pNegOp, pUminusOp :: Parser (Expr -> Expr)
--- pNegOp
---   = do
---       reservedOp "!"
---       return Neg
-
--- pUminusOp
---   = do
---     reservedOp "-"
---     expr <- pFactor
---     return (UMinus expr)
 
 pMain :: Parser GoatProgram
 pMain
