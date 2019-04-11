@@ -7,6 +7,7 @@ import Text.Parsec.Language (emptyDef)
 import qualified Text.Parsec.Token as Q
 import System.Environment
 import System.Exit
+import GHC.Float
 
 type Parser a
   = Parsec String () a
@@ -27,6 +28,7 @@ lexer
 whiteSpace = Q.whiteSpace lexer
 lexeme     = Q.lexeme lexer
 natural    = Q.natural lexer
+float      = Q.float lexer
 identifier = Q.identifier lexer
 colon      = Q.colon lexer
 semi       = Q.semi lexer
@@ -263,9 +265,10 @@ pIdent
 
 pConst :: Parser Expr
 pConst
-  = choice [pBool, pString, pInt, pFloat]
+  = choice [pBool, pString, pNum]
+  -- pInt, pFloat]
 
-pBool, pString, pInt, pFloat :: Parser Expr
+pBool, pString, pNum :: Parser Expr
 
 pBool
   = do
@@ -285,30 +288,43 @@ pString
     char '"'
     return (StrConst str)
 
-pInt
-  = do
-    { n <- natural <?> ""
-    ; return (IntConst (fromInteger n :: Int))
-  }
-  <?>
-  "integer"
+-- pInt
+--   = do
+--     { n <- natural <?> ""
+--     ; return (IntConst (fromInteger n :: Int))
+--   }
+--   <?>
+--   "integer"
 
-pFloat
+pNum
   = lexeme (
-    try ( do
-        { ws <- many1 digit
-        ; char '.'
-        ; ds <- many1 digit
-        ; let val = read (ws ++ ('.' : ds)) :: Float
-        ; return (FloatConst val)
-        })
-        <|>
-        ( do
-        { ws <- many1 digit
-        ; let val = read ws :: Float
-        ; return (FloatConst val)
-        })
-    )
+      try ( do
+          { n <- float
+          ; return (FloatConst (double2Float n :: Float))
+      })
+      <|>
+      ( do
+      { n <- natural
+      ; return (IntConst (fromInteger n :: Int))
+      })
+  )
+
+-- pFloat
+--   = lexeme (
+--     try ( do
+--         { ws <- many1 digit
+--         ; char '.'
+--         ; ds <- many1 digit
+--         ; let val = read (ws ++ ('.' : ds)) :: Float
+--         ; return (FloatConst val)
+--         })
+--         <|>
+--         ( do
+--         { ws <- many1 digit
+--         ; let val = read ws :: Float
+--         ; return (FloatConst val)
+--         })
+--     )
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
