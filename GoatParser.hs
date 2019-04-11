@@ -179,7 +179,7 @@ pStmt, pAssign, pRead, pSWrite, pWrite, pCall, pIf, pWhile :: Parser Stmt
 
 
 pStmt
-  = choice [pAssign, pRead, pSWrite, pWrite, pCall, pIf, pWhile]
+  = choice [pAssign, pRead, pWrite, pSWrite, pCall, pIf, pWhile]
 
 
 pAssign
@@ -198,11 +198,11 @@ pRead
     return (Read lvalue)
 
 pWrite
-  = do
+  = try ( do
     reserved "write"
     expr <- pExpr
     semi
-    return (Write expr)
+    return (Write expr))
 
 pSWrite
   = do
