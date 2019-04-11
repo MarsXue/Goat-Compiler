@@ -1,11 +1,9 @@
-proc        main (val int a, ref float b, val bool c)
+proc        main ()
 
-int x [10,9];
-int n;
-float y;
-bool a[8];
 
 begin
-a := 2 * (1 + 10) + 2 + 2 * 2 + 14;
-b := - (- (- 42));
+
+write "string";
+x := "string2";
+
 end
