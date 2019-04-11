@@ -174,11 +174,11 @@ pBaseType
 -- --  pStmt is the main parser for statements. It wants to recognise
 -- --  read and write statements, and assignments.
 -- -----------------------------------------------------------------
-pStmt, pAssign, pRead, pWrite, pCall, pIf, pIfElse, pWhile :: Parser Stmt
+pStmt, pAssign, pRead, pSWrite, pWrite, pCall, pIf, pWhile :: Parser Stmt
 
 
 pStmt
-  = choice [pAssign, pRead, pWrite, pCall, pIf, pIfElse, pWhile]
+  = choice [pAssign, pRead, pSWrite, pWrite, pCall, pIf, pWhile]
 
 
 pAssign
@@ -203,6 +203,13 @@ pWrite
     semi
     return (Write expr)
 
+pSWrite
+  = do
+    reserved "write"
+    str <- pString
+    semi
+    return (SWrite str)
+
 pCall
   = do
     reserved "call"
@@ -211,27 +218,45 @@ pCall
     semi
     return (Call ident exprs)
 
-pIf
-  = try ( do
-    reserved "if"
-    expr <- pExpr
-    reserved "then"
-    stmts <- many1 pStmt
-    reserved "fi"
-    return (If expr stmts)
-  )
+-- pIf
+--   = try ( do
+--     reserved "if"
+--     expr <- pExpr
+--     reserved "then"
+--     stmts <- many1 pStmt
+--     reserved "fi"
+--     return (If expr stmts)
+--   )
+--
+-- pIfElse
+--   = try ( do
+--     reserved "if"
+--     expr <- pExpr
+--     reserved "then"
+--     thsms <- many1 pStmt
+--     reserved "else"
+--     elsms <- many1 pStmt
+--     reserved "fi"
+--     return (IfElse expr thsms elsms)
+--   )
 
-pIfElse
-  = try ( do
-    reserved "if"
-    expr <- pExpr
-    reserved "then"
-    thsms <- many1 pStmt
-    reserved "else"
-    elsms <- many1 pStmt
-    reserved "fi"
-    return (IfElse expr thsms elsms)
-  )
+pIf
+  = do
+      reserved "if"
+      expr <- pExpr
+      reserved "then"
+      thsms <- many1 pStmt
+      elsms <- (
+        do
+          reserved "else"
+          e <- many1 pStmt
+          reserved "fi"
+          return e
+        <|>
+        do
+          reserved "fi"
+          return [])
+      return (If expr thsms elsms)
 
 pWhile
   = do
@@ -268,7 +293,7 @@ pConst
   = choice [pBool, pNum]
 
 
-pBool, pString, pNum :: Parser Expr
+pBool, pNum :: Parser Expr
 
 pBool
   = do
@@ -280,13 +305,6 @@ pBool
     { reserved "false"
     ; return (BoolConst False)
   }
-
-pString
-  = lexeme (do
-    char '"'
-    str <- many (satisfy (/= '"'))
-    char '"'
-    return (StrConst str))
 
 -- pInt
 --   = do
@@ -309,6 +327,14 @@ pNum
       })
   )
 
+pString :: Parser String
+pString
+  = lexeme (do
+    char '"'
+    str <- many (satisfy (/= '"'))
+    char '"'
+    return str)
+
 -- pFloat
 --   = lexeme (
 --     try ( do
@@ -329,7 +355,7 @@ pNum
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
 pExpr
-  = pString <|> chainl1 pOrExpr pOrOp
+  = chainl1 pOrExpr pOrOp
 
 pOrExpr
   = chainl1 pAndExpr pAndOp

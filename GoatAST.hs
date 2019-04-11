@@ -39,7 +39,6 @@ data Expr
   | BoolConst Bool
   | IntConst Int
   | FloatConst Float
-  | StrConst String
   | Add Expr Expr
   | Minus Expr Expr
   | Mul Expr Expr
@@ -64,9 +63,9 @@ data Stmt
   = Assign StmtVar Expr
   | Read StmtVar
   | Write Expr
+  | SWrite String
   | Call Ident [Expr]
-  | If Expr [Stmt]
-  | IfElse Expr [Stmt] [Stmt]
+  | If Expr [Stmt] [Stmt]
   | While Expr [Stmt]
   deriving (Show, Eq)
 
