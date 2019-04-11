@@ -265,8 +265,8 @@ pIdent
 
 pConst :: Parser Expr
 pConst
-  = choice [pBool, pString, pNum]
-  -- pInt, pFloat]
+  = choice [pBool, pNum]
+
 
 pBool, pString, pNum :: Parser Expr
 
@@ -282,11 +282,11 @@ pBool
   }
 
 pString
-  = do
+  = lexeme (do
     char '"'
     str <- many (satisfy (/= '"'))
     char '"'
-    return (StrConst str)
+    return (StrConst str))
 
 -- pInt
 --   = do
@@ -329,7 +329,7 @@ pNum
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
 pExpr
-  = chainl1 pOrExpr pOrOp
+  = pString <|> chainl1 pOrExpr pOrOp
 
 pOrExpr
   = chainl1 pAndExpr pAndOp
@@ -356,7 +356,6 @@ pTerm
   = chainl1 pFactor pFactorOp
 
 pFactor
-  -- = chainl1 pBaseExpr pUminusOp
   = try (do
         { reservedOp "-"
         ; expr <- pFactor
