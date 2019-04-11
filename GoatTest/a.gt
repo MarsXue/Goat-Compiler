@@ -3,7 +3,8 @@ proc        main ()
 
 begin
 
-write "string";
-x := "string2";
+write "string\n";
+x := 7.8;
+y := 7;
 
 end

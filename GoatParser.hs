@@ -9,6 +9,7 @@ import qualified Text.Parsec.Token as Q
 import System.Environment
 import System.Exit
 import GHC.Float
+import Data.Text
 
 type Parser a
   = Parsec String () a
@@ -324,9 +325,9 @@ pString :: Parser String
 pString
   = lexeme (do
     char '"'
-    str <- many (satisfy (/= '"'))
+    str <- many (satisfy (not . (`elem` "\"\n\t")))
     char '"'
-    return str)
+    return (unpack $ replace (pack "\\n") (pack "\n") (pack str)))
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
@@ -459,10 +460,14 @@ main
     { progname <- getProgName
     ; args <- getArgs
     ; checkArgs progname args
-    ; input <- readFile (head args)
+    ; input <- readFile (Prelude.head args)
     ; let output = runParser pMain () "" input
     ; case output of
-        Right ast -> do putStr $ progToString ast
+        Right ast -> do { print ast
+                        ; putStrLn ""
+                        ; putStr $ progToString ast
+                        }
+
         Left  err -> do { putStr "Parse error at "
                         ; print err
                         }
