@@ -104,13 +104,13 @@ pDecl :: Parser Decl
 pDecl
   = do
     btype <- pBaseType
-    var <- pVar
+    dvar <- pDeclVar
     whiteSpace
     semi
-    return (Decl btype var)
+    return (Decl btype dvar)
 
-pVar:: Parser Var
-pVar
+pDeclVar:: Parser DeclVar
+pDeclVar
   = lexeme (
     try ( do
       { ident <- identifier
@@ -118,6 +118,15 @@ pVar
       ; return (ShapeVar ident shape)
       })
     <|>
+      ( do
+      { ident <- identifier
+      ; return (DBaseVar ident)
+      })
+  )
+
+pStmtVar :: Parser StmtVar
+pStmtVar
+  = lexeme (
     try ( do
       { ident <- identifier
       ; index <- pIndex
@@ -126,7 +135,7 @@ pVar
     <|>
       ( do
       { ident <- identifier
-      ; return (BaseVar ident)
+      ; return (SBaseVar ident)
       })
   )
 
@@ -240,8 +249,8 @@ pWhile
 pLValue :: Parser LValue
 pLValue
   = do
-    v <- pVar
-    return (LValue v)
+    svar <- pStmtVar
+    return (LValue svar)
 
 pIndex :: Parser Index
 pIndex = brackets (
@@ -261,8 +270,8 @@ pIndex = brackets (
 pIdent :: Parser Expr
 pIdent
   = do
-    v <- pVar
-    return (Id v)
+    svar <- pStmtVar
+    return (Id svar)
 
 pConst :: Parser Expr
 pConst
