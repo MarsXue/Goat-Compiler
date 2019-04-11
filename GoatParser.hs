@@ -48,46 +48,40 @@ myOpnames
   = [ "+", "-", "*", "/", ":=", "||", "&&",
       "=", "!=", "<", "<=", ">", ">=", "!" ]
 
-pProg :: Parser GoatProgram
+pProg :: Parser GoatProg
 pProg
   = do
     procs <- many1 pProc
-    return (Program procs)
+    return (Prog procs)
 
-pProc :: Parser Procedure
+pProc :: Parser Proc
 pProc
   = do
     reserved "proc"
-    header <- pHeader
-    (decls, stmts) <- pProcBody
-    return (Procedure header decls stmts)
-
-pHeader :: Parser Header
-pHeader
-  = do
     ident <- identifier
-    params <- parens (pParameter `sepBy` comma)
-    return (Header ident params)
+    params <- parens (pParam `sepBy` comma)
+    (decls, stmts) <- pProcBody
+    return (Proc ident params decls stmts)
 
-pParameter :: Parser Parameter
-pParameter
+pParam :: Parser Param
+pParam
   = do
     ind <- pIndicator
     t <- pBaseType
     ident <- identifier
-    return (Parameter ind t ident)
+    return (Param ind t ident)
 
 pIndicator :: Parser Indicator
 pIndicator
   = lexeme (
-    try ( do 
+    try ( do
       { reserved "val"
-      ; return Val 
+      ; return Val
       })
     <|>
-    ( do 
+    ( do
       { reserved "ref"
-      ; return Ref 
+      ; return Ref
       })
     )
 
@@ -158,19 +152,19 @@ pShape =
 pBaseType :: Parser BaseType
 pBaseType
   = lexeme (
-      try ( do 
+      try ( do
           { reserved "bool"
-          ; return BoolType 
+          ; return BoolType
           })
       <|>
-      try ( do 
+      try ( do
           { reserved "int"
-          ; return IntType 
+          ; return IntType
           })
       <|>
-      ( do 
+      ( do
         { reserved "float"
-        ; return FloatType 
+        ; return FloatType
         })
     )
 
@@ -290,7 +284,7 @@ pBool
     ; return (BoolConst False)
   }
 
-pString 
+pString
   = do
     char '"'
     str <- many (satisfy (/= '"'))
@@ -307,7 +301,7 @@ pInt
 
 pFloat
   = lexeme (
-    try ( do 
+    try ( do
         { ws <- many1 digit
         ; char '.'
         ; ds <- many1 digit
@@ -315,7 +309,7 @@ pFloat
         ; return (FloatConst val)
         })
         <|>
-        ( do 
+        ( do
         { ws <- many1 digit
         ; let val = read ws :: Float
         ; return (FloatConst val)
@@ -339,7 +333,7 @@ pAndExpr
         })
     <|>
     do
-    { pNegExpr 
+    { pNegExpr
     }
 
 pNegExpr
@@ -353,7 +347,7 @@ pTerm
 
 pFactor
   -- = chainl1 pBaseExpr pUminusOp
-  = try (do 
+  = try (do
         { reservedOp "-"
         ; expr <- pFactor
         ; return (UMinus expr)
@@ -377,7 +371,7 @@ pAndOp
     reservedOp "&&"
     return And
 
-pComOp 
+pComOp
   = choice [pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp, pGreaterOp, pGreaterEqualOp]
 
 pTermOp
@@ -409,7 +403,7 @@ pLessEqualOp
     return LessEqual
 
 pGreaterOp
-  = do 
+  = do
     reservedOp ">"
     return Greater
 
@@ -421,7 +415,7 @@ pGreaterEqualOp
 pAddOp, pMinusOp, pMulOp, pDivOp :: Parser (Expr -> Expr -> Expr)
 
 pAddOp
-  = do 
+  = do
     reservedOp "+"
     return Add
 
@@ -440,7 +434,7 @@ pDivOp
     reservedOp "/"
     return Div
 
-pMain :: Parser GoatProgram
+pMain :: Parser GoatProg
 pMain
   = do
       whiteSpace

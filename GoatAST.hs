@@ -1,7 +1,7 @@
 module GoatAST where
 
 -----------------------------------
--- Specification of an AST for Goat 
+-- Specification of an AST for Goat
 -----------------------------------
 
 type Ident = String
@@ -69,23 +69,19 @@ data Stmt
   | Read LValue
   | Write Expr
   | Call Ident [Expr]
-  | If Expr [Stmt] 
+  | If Expr [Stmt]
   | IfElse Expr [Stmt] [Stmt]
   | While Expr [Stmt]
   deriving (Show, Eq)
 
-data Parameter
-  = Parameter Indicator BaseType Ident
+data Param
+  = Param Indicator BaseType Ident
   deriving (Show, Eq)
 
-data Header
-  = Header Ident [Parameter]
+data Proc
+  = Proc Ident [Param] [Decl] [Stmt]
   deriving (Show, Eq)
 
-data Procedure
-  = Procedure Header [Decl] [Stmt]
-  deriving (Show, Eq)
-
-data GoatProgram
-  = Program [Procedure]
+data GoatProg
+  = Prog [Proc]
   deriving (Show, Eq)
