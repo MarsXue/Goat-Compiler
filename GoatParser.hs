@@ -181,7 +181,7 @@ pStmt
 
 pAssign
   = do
-    lvalue <- pLValue
+    lvalue <- pStmtVar
     reservedOp ":="
     rvalue <- pExpr
     semi
@@ -190,7 +190,7 @@ pAssign
 pRead
   = do
     reserved "read"
-    lvalue <- pLValue
+    lvalue <- pStmtVar
     semi
     return (Read lvalue)
 
@@ -239,12 +239,6 @@ pWhile
     stmts <- many1 pStmt
     reserved "od"
     return (While expr stmts)
-
-pLValue :: Parser LValue
-pLValue
-  = do
-    svar <- pStmtVar
-    return (LValue svar)
 
 pIndex :: Parser Index
 pIndex = brackets (

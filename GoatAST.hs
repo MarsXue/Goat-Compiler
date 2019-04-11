@@ -34,10 +34,6 @@ data StmtVar
   | IndexVar Ident Index
   deriving (Show, Eq)
 
-data LValue
-  = LValue StmtVar
-  deriving (Show, Eq)
-
 data Expr
   = Id StmtVar
   | BoolConst Bool
@@ -65,8 +61,8 @@ data Decl
   deriving (Show, Eq)
 
 data Stmt
-  = Assign LValue Expr
-  | Read LValue
+  = Assign StmtVar Expr
+  | Read StmtVar
   | Write Expr
   | Call Ident [Expr]
   | If Expr [Stmt]
