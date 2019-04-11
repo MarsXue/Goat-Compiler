@@ -76,7 +76,7 @@ pParam
 pIndicator :: Parser Indicator
 pIndicator
   = lexeme (
-    try ( do
+    ( do
       { reserved "val"
       ; return Val
       })
@@ -154,12 +154,12 @@ pShape =
 pBaseType :: Parser BaseType
 pBaseType
   = lexeme (
-      try ( do
+      ( do
           { reserved "bool"
           ; return BoolType
           })
       <|>
-      try ( do
+      ( do
           { reserved "int"
           ; return IntType
           })
@@ -306,14 +306,6 @@ pBool
     ; return (BoolConst False)
   }
 
--- pInt
---   = do
---     { n <- natural <?> ""
---     ; return (IntConst (fromInteger n :: Int))
---   }
---   <?>
---   "integer"
-
 pNum
   = lexeme (
       try ( do
@@ -334,23 +326,6 @@ pString
     str <- many (satisfy (/= '"'))
     char '"'
     return str)
-
--- pFloat
---   = lexeme (
---     try ( do
---         { ws <- many1 digit
---         ; char '.'
---         ; ds <- many1 digit
---         ; let val = read (ws ++ ('.' : ds)) :: Float
---         ; return (FloatConst val)
---         })
---         <|>
---         ( do
---         { ws <- many1 digit
---         ; let val = read ws :: Float
---         ; return (FloatConst val)
---         })
---     )
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
