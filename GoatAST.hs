@@ -24,18 +24,22 @@ data Index
   | DIndex Expr Expr
   deriving (Show, Eq)
 
-data Var
-  = BaseVar Ident
+data DeclVar
+  = DBaseVar Ident
   | ShapeVar Ident Shape
+  deriving (Show, Eq)
+
+data StmtVar
+  = SBaseVar Ident
   | IndexVar Ident Index
   deriving (Show, Eq)
 
 data LValue
-  = LValue Var
+  = LValue StmtVar
   deriving (Show, Eq)
 
 data Expr
-  = Id Var
+  = Id StmtVar
   | BoolConst Bool
   | IntConst Int
   | FloatConst Float
@@ -57,7 +61,7 @@ data Expr
   deriving (Show, Eq)
 
 data Decl
-  = Decl BaseType Var
+  = Decl BaseType DeclVar
   deriving (Show, Eq)
 
 data Stmt
