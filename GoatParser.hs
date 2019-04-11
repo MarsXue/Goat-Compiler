@@ -1,5 +1,6 @@
 module Main where
 
+import GoatFormat
 import GoatAST
 import Data.Char
 import Text.Parsec
@@ -461,7 +462,7 @@ main
     ; input <- readFile (head args)
     ; let output = runParser pMain () "" input
     ; case output of
-        Right ast -> print ast
+        Right ast -> do putStr $ progToString ast
         Left  err -> do { putStr "Parse error at "
                         ; print err
                         }
