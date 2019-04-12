@@ -327,7 +327,7 @@ pString
     char '"'
     str <- many (satisfy (not . (`elem` "\"\n\t")))
     char '"'
-    return (unpack $ replace (pack "\\n") (pack "\n") (pack str)))
+    return (str))
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
