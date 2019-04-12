@@ -460,7 +460,8 @@ main
     { progname <- getProgName
     ; args <- getArgs
     ; checkArgs progname args
-    ; input <- readFile (Prelude.head args)
+    ; let [_, filename] = args
+    ; input <- readFile filename
     ; let output = runParser pMain () "" input
     ; case output of
         Right ast -> do { print ast
@@ -474,10 +475,17 @@ main
     }
 
 checkArgs :: String -> [String] -> IO ()
+checkArgs _ ['-':_]
+  = do
+      putStrLn ("Missing filename")
+      exitWith (ExitFailure 1)
 checkArgs _ [filename]
+  = do
+      putStrLn "Sorry, cannot generate code yet"
+      exitWith ExitSuccess
+checkArgs _ ["-p", filename]
   = return ()
 checkArgs progname _
   = do
-    { putStrLn ("Usage: " ++ progname ++ " filename\n\n")
-    ; exitWith (ExitFailure 1)
-    }
+      putStrLn ("Usage: " ++ progname ++ " [-p] filename\n\n")
+      exitWith (ExitFailure 1)
