@@ -41,6 +41,10 @@ reserved   = Q.reserved lexer
 reservedOp = Q.reservedOp lexer
 brackets   = Q.brackets lexer
 
+data Task
+  = Compile | Pprint | Parse
+  deriving (Show, Eq)
+
 myReserved, myOpnames :: [String]
 
 myReserved
@@ -457,35 +461,52 @@ pMain
 main :: IO ()
 main
   = do
-    { progname <- getProgName
-    ; args <- getArgs
-    ; checkArgs progname args
-    ; let [_, filename] = args
-    ; input <- readFile filename
-    ; let output = runParser pMain () "" input
-    ; case output of
-        Right ast -> do { print ast
-                        ; putStrLn ""
-                        ; putStr $ progToString ast
-                        }
+      progname <- getProgName
+      args <- getArgs
+      task <- checkArgs progname args
+      if task == Compile then
+        do
+          putStrLn "Sorry, cannot generate code yet"
+          exitWith ExitSuccess
+      else
+        if task == Parse then
+          do
+            let [_, filename] = args
+            input <- readFile filename
+            let output = runParser pMain () "" input
+            case output of
+              Right ast -> do { print ast
+                              ; putStrLn ""
+                              -- ; putStr $ progToString ast
+                              }
+              Left  err -> do { putStr "Parse error at "
+                              ; print err
+                              ; exitWith (ExitFailure 2)
+                              }
+        else
+          do
+            let [_, filename] = args
+            input <- readFile filename
+            let output = runParser pMain () "" input
+            case output of
+              Right ast -> putStr $ progToString ast
+              Left  err -> do { putStr "Parse error at "
+                              ; print err
+                              ; exitWith (ExitFailure 2)
+                              }
 
-        Left  err -> do { putStr "Parse error at "
-                        ; print err
-                        }
-    }
-
-checkArgs :: String -> [String] -> IO ()
+checkArgs :: String -> [String] -> IO Task
 checkArgs _ ['-':_]
   = do
       putStrLn ("Missing filename")
       exitWith (ExitFailure 1)
 checkArgs _ [filename]
-  = do
-      putStrLn "Sorry, cannot generate code yet"
-      exitWith ExitSuccess
+  = return Compile
 checkArgs _ ["-p", filename]
-  = return ()
+  = return Pprint
+checkArgs _ ["-a", filename]
+  = return Parse
 checkArgs progname _
   = do
-      putStrLn ("Usage: " ++ progname ++ " [-p] filename\n\n")
+      putStrLn ("Usage: " ++ progname ++ " [-p] filename")
       exitWith (ExitFailure 1)

@@ -1,0 +1,20 @@
+proc main ()
+begin
+    # read x;
+    # read x [y];
+    # read x [y, z];
+    # write z;
+    # write mood;
+    # write "Hello World!\n";
+    # call p(n);
+    # call x(y, z);
+    
+    if m > 0 then
+        m := n - m;
+    else
+        read n;
+    fi
+
+    a := "string" + "test";
+
+end
