@@ -13,7 +13,7 @@ progToString (Prog (p:procs))
 procToString :: Proc -> String
 procToString (Proc ident params decls stmts)
   -- TOKEN "proc"
-  =  "proc " 
+  = "proc " 
   -- Header with identifier and parameters in parentheses
   ++ ident ++ " (" ++ paramsToString params ++ ")\n"
   -- Declarations
@@ -37,9 +37,9 @@ paramsToString (p:params)
 -- Parameter to String
 paramToString :: Param -> String
 paramToString (Param Val basetype ident)
-  = "val" ++ " " ++ (baseTypeToString basetype) ++ " " ++ ident
+  = "val " ++ (baseTypeToString basetype) ++ " " ++ ident
 paramToString (Param Ref basetype ident)
-  = "ref" ++ " " ++ (baseTypeToString basetype) ++ " " ++ ident
+  = "ref " ++ (baseTypeToString basetype) ++ " " ++ ident
 
 -- Declarations to String (recursive)
 declsToString :: [Decl] -> String
@@ -51,7 +51,7 @@ declsToString (decl:decls)
 declToString :: Decl -> String
 declToString (Decl baseType declVar)
   -- Declaration is default with 4 spaces indentation
-  =  "    " 
+  = "    "
   -- Base type for declaration
   ++ baseTypeToString baseType
   ++ " "
@@ -78,24 +78,18 @@ shapeToString (SShape a)
 shapeToString (DShape a b)
   = "[" ++ (show a) ++ "," ++ (show b) ++ "]"
 
--- Index to String
-indexToString :: Index -> String
-indexToString (SIndex expr)
-  = "[" ++ (exprToString False expr) ++ "]"
-indexToString (DIndex expr1 expr2)
-  = "[" ++ (exprToString False expr1) ++ "," ++ (exprToString False expr2) ++ "]"
-
 -- Statements to String (recursive)
 stmtsToString :: Int -> [Stmt] -> String
 stmtsToString _ [] = ""
-stmtsToString a (s:stmts) =
-  (stmtToString a s) ++ (stmtsToString a stmts)
+stmtsToString a (s:stmts)
+  = (stmtToString a s) ++ (stmtsToString a stmts)
 
 -- Statement to String
 stmtToString :: Int -> Stmt -> String
 -- Assign statement
 stmtToString a (Assign stmtVar expr)
-  = (spaces a) ++ (stmtVarToString stmtVar) ++ " := " ++ (exprToString False expr) ++ ";\n"
+  = (spaces a) ++ (stmtVarToString stmtVar)
+  ++ " := " ++ (exprToString False expr) ++ ";\n"
 -- Read statement
 stmtToString a (Read stmtVar)
   = (spaces a) ++ "read " ++ (stmtVarToString stmtVar) ++ ";\n"
@@ -110,33 +104,33 @@ stmtToString a (Call ident exprs)
   = (spaces a) ++ "call " ++ ident ++ (exprsToString exprs) ++ ";\n"
 -- If statement
 stmtToString a (If expr stmts1 stmts2)
-  =  (spaces a)
+  = (spaces a)
   -- TOKEN "if"
-  ++ "if " 
+  ++ "if "
   ++ (exprToString False expr)
   -- TOKEN "then"
-  ++ " then\n" 
+  ++ " then\n"
   ++ (stmtsToString (a+1) stmts1)
   -- If stmts2 is non-empty list, there is a else statement
-  ++ rest 
+  ++ rest
   ++ (spaces a)
   -- TOKEN "fi"
   ++ "fi\n"
   where
       rest
         | length stmts2 == 0  = ""
-        | otherwise           =  (spaces a) 
+        | otherwise           =  (spaces a)
                               -- TOKEN "else"
-                              ++ "else\n" 
+                              ++ "else\n"
                               ++ (stmtsToString (a+1) stmts2)
 stmtToString a (While expr stmts)
-  =  (spaces a) 
+  = (spaces a)
   -- TOKEN "while"
   ++ "while "
   ++ (exprToString False expr)
   -- TOKEN "do"
-  ++ " do\n" 
-  ++ (stmtsToString (a+1) stmts) 
+  ++ " do\n"
+  ++ (stmtsToString (a+1) stmts)
   ++ (spaces a)
   -- TOKEN "od"
   ++ "od\n"
@@ -145,6 +139,14 @@ stmtToString a (While expr stmts)
 stmtVarToString :: StmtVar -> String
 stmtVarToString (SBaseVar ident) = ident
 stmtVarToString (IndexVar ident index) = ident ++ (indexToString index)
+
+-- Index to String
+indexToString :: Index -> String
+indexToString (SIndex expr)
+  = "[" ++ (exprToString False expr) ++ "]"
+indexToString (DIndex expr1 expr2)
+  = "[" ++ (exprToString False expr1) ++ ","
+  ++ (exprToString False expr2) ++ "]"
 
 -- Expressions to String (recursive)
 exprsToString :: [Expr] -> String
@@ -163,7 +165,7 @@ exprToString _ (BoolConst True) = "true"
 exprToString _ (BoolConst False) = "false"
 exprToString _ (IntConst int) = show int
 exprToString _ (FloatConst float) = show float
--- Binary operation
+-- Binary operation expression
 exprToString bool (Add expr1 expr2)
   = genBinopString bool " + " expr1 expr2
 exprToString bool (Minus expr1 expr2)
@@ -188,7 +190,7 @@ exprToString bool (Greater expr1 expr2)
   = genBinopString bool " > " expr1 expr2
 exprToString bool (GreaterEqual expr1 expr2)
   = genBinopString bool " >= " expr1 expr2
--- Unary operation
+-- Unary operation expression
 exprToString _ (Neg expr)
   = "!" ++ (exprToString True expr)
 exprToString _ (UMinus expr)
