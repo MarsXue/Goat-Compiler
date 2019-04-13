@@ -1,3 +1,7 @@
+---------------------------------------------------------
+-- Programming Language Implementation COMP90045 Project1
+-- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
+---------------------------------------------------------
 module Main where
 
 import GoatFormat
@@ -13,6 +17,10 @@ import Data.Text
 
 type Parser a
   = Parsec String () a
+
+data Task
+  = Compile | Pprint | Parse
+  deriving (Show, Eq)
 
 lexer :: Q.TokenParser ()
 lexer
@@ -41,403 +49,471 @@ reserved   = Q.reserved lexer
 reservedOp = Q.reservedOp lexer
 brackets   = Q.brackets lexer
 
-data Task
-  = Compile | Pprint | Parse
-  deriving (Show, Eq)
-
 myReserved, myOpnames :: [String]
-
+-- Reserved Tokens
 myReserved
-  = [ "begin", "bool", "do", "call", "else", "end", "false",
-      "fi", "float", "if", "int", "od", "proc", "read",
-      "ref", "then", "true", "val", "while", "write"]
-
+  = [ "begin",
+      "bool",
+      "do",
+      "call",
+      "else",
+      "end",
+      "false",
+      "fi",
+      "float",
+      "if",
+      "int",
+      "od",
+      "proc",
+      "read",
+      "ref",
+      "then",
+      "true",
+      "val",
+      "while",
+      "write"]
+-- Reserved Operation characters
 myOpnames
   = [ "+", "-", "*", "/", ":=", "||", "&&",
       "=", "!=", "<", "<=", ">", ">=", "!" ]
 
+-- Parser for Goat Program
 pProg :: Parser GoatProg
 pProg
   = do
-    procs <- many1 pProc
-    return (Prog procs)
+      procs <- many1 pProc -- Goat Program contains one or more procdures
+      return (Prog procs)
 
+-- Parser for Procdures
 pProc :: Parser Proc
 pProc
   = do
-    reserved "proc"
-    ident <- identifier
-    params <- parens (pParam `sepBy` comma)
-    (decls, stmts) <- pProcBody
-    return (Proc ident params decls stmts)
+      reserved "proc" -- Reserved token "proc"
+      ident <- identifier -- parse Procdure identifier
+      params <- parens (pParam `sepBy` comma) -- parse parameters within ()
+      (decls, stmts) <- pProcBody -- parse procdure body
+      return (Proc ident params decls stmts)
 
+-- Parser for one parameter
 pParam :: Parser Param
 pParam
   = do
-    ind <- pIndicator
-    t <- pBaseType
-    ident <- identifier
-    return (Param ind t ident)
+      ind <- pIndicator -- Parse indicator "val" or "ref"
+      t <- pBaseType -- Parse basetype
+      ident <- identifier -- Parse parameter identifier
+      return (Param ind t ident)
 
+-- Parser for parameter indicator
 pIndicator :: Parser Indicator
 pIndicator
   = lexeme (
-    ( do
-      { reserved "val"
-      ; return Val
-      })
-    <|>
-    ( do
-      { reserved "ref"
-      ; return Ref
-      })
+      do
+        reserved "val"
+        return Val
+      <|>
+      do
+        reserved "ref"
+        return Ref
     )
 
+-- Parser for procdure body
 pProcBody :: Parser ([Decl], [Stmt])
 pProcBody
   = do
-    decls <- many pDecl
-    reserved "begin"
-    stmts <- many1 pStmt
-    reserved "end"
-    return (decls, stmts)
+      decls <- many pDecl -- Procdure consists of zero or more declarations
+      reserved "begin" -- Reserved token
+      stmts <- many1 pStmt -- Procdure consists of one or more statements
+      reserved "end" -- Reserved token
+      return (decls, stmts)
 
+-- Parser for declarations
 pDecl :: Parser Decl
 pDecl
   = do
-    btype <- pBaseType
-    dvar <- pDeclVar
-    whiteSpace
-    semi
-    return (Decl btype dvar)
+      btype <- pBaseType -- Parse base type
+      dvar <- pDeclVar -- Parse Variables
+      semi -- End token ';'
+      return (Decl btype dvar)
 
+-- Parser for variables in declarations
 pDeclVar:: Parser DeclVar
 pDeclVar
-  = lexeme (
-    try ( do
-      { ident <- identifier
-      ; shape <- pShape
-      ; return (ShapeVar ident shape)
-      })
+    -- Try to parse the variable with shape.
+  = try (
+      do
+        ident <- identifier -- Parse identifier
+        shape <- pShape -- Parse shape
+        return (ShapeVar ident shape)
+    )
     <|>
-      ( do
-      { ident <- identifier
-      ; return (DBaseVar ident)
-      })
-  )
+    -- If fail, parse the variable as basetype.
+    do
+      ident <- identifier -- Parse identifier
+      return (DBaseVar ident)
 
+-- Parser for variables in statements
 pStmtVar :: Parser StmtVar
 pStmtVar
-  = lexeme (
-    try ( do
-      { ident <- identifier
-      ; index <- pIndex
-      ; return (IndexVar ident index)
-      })
+    -- Try to parse the variable with index.
+  = try (
+      do
+        ident <- identifier -- parse identifier
+        index <- pIndex -- parse index
+        return (IndexVar ident index)
+    )
     <|>
-      ( do
-      { ident <- identifier
-      ; return (SBaseVar ident)
-      })
-  )
+    -- If fail, parse the variable as BaseType.
+    do
+      ident <- identifier
+      return (SBaseVar ident)
 
+-- Parser for shape
 pShape :: Parser Shape
-pShape =
-  brackets (
-    try ( do
-        { n1 <- natural
-        ; lexeme (char ',')
-        ; n2 <- natural
-        ; return (DShape (fromInteger n1 :: Int) (fromInteger n2 :: Int))
-        })
+pShape
+    -- Shape is surrounded by '[' and ']'.
+  = brackets (
+      -- Try to recognise shape as a matrix.
+      try (
+        do
+          n1 <- natural -- Parse the first integer.
+          lexeme (char ',')
+          n2 <- natural -- Parse the second integer.
+          return (DShape (fromInteger n1 :: Int) (fromInteger n2 :: Int))
+      )
       <|>
-        (do
-        { n <- natural
-        ; return (SShape (fromInteger n :: Int))
-        })
-  )
+      -- If fail, recognise shape as an array.
+      do
+        n <- natural -- Parse the integer.
+        return (SShape (fromInteger n :: Int))
+    )
 
+-- Parser for index
+pIndex :: Parser Index
+pIndex
+    -- Index is surrounded by '[' and ']'.
+  = brackets (
+      -- Try to recognise index as a matrix.
+      try (
+        do
+          e1 <- pExpr -- Parse the first expression.
+          lexeme (char ',')
+          e2 <- pExpr -- Parse the second expression.
+          return (DIndex e1 e2)
+      )
+      <|>
+      -- If fail, recognise index as an array.
+      do
+        e <- pExpr -- Parse the expression.
+        return (SIndex e)
+    )
+
+-- Parser for basetype: int, float, bool
 pBaseType :: Parser BaseType
 pBaseType
-  = lexeme (
-      ( do
-          { reserved "bool"
-          ; return BoolType
-          })
-      <|>
-      ( do
-          { reserved "int"
-          ; return IntType
-          })
-      <|>
-      ( do
-        { reserved "float"
-        ; return FloatType
-        })
-    )
+  = do
+      reserved "bool"
+      return BoolType
+    <|>
+    do
+      reserved "int"
+      return IntType
+    <|>
+    do
+      reserved "float"
+      return FloatType
 
 -- -----------------------------------------------------------------
 -- --  pStmt is the main parser for statements. It wants to recognise
--- --  read and write statements, and assignments.
+-- --  any type of statements as specified in rules.
 -- -----------------------------------------------------------------
-pStmt, pAssign, pRead, pSWrite, pWrite, pCall, pIf, pWhile :: Parser Stmt
+pStmt, pAssign, pRead, pWrite, pSWrite, pCall, pIf, pWhile :: Parser Stmt
 
-
+-- Parser for all statements, it recognise all statements and make choice.
 pStmt
   = choice [pAssign, pRead, pWrite, pSWrite, pCall, pIf, pWhile]
 
-
+-- Parser for assignment statements.
 pAssign
   = do
-    lvalue <- pStmtVar
-    reservedOp ":="
-    rvalue <- pExpr
-    semi
-    return (Assign lvalue rvalue)
+      lvalue <- pStmtVar -- Recognise the left value
+      reservedOp ":=" -- Reserved token
+      rvalue <- pExpr -- Parse the assigned expression
+      semi
+      return (Assign lvalue rvalue)
 
+-- Parser for read statements.
 pRead
   = do
-    reserved "read"
-    lvalue <- pStmtVar
-    semi
-    return (Read lvalue)
+      reserved "read" -- Reserved token
+      var <- pStmtVar -- Recognise the variable
+      semi
+      return (Read var)
 
+-- Parser for write expression statements.
 pWrite
-  = try ( do
-    reserved "write"
-    expr <- pExpr
-    semi
-    return (Write expr))
+  = try (
+      do
+        reserved "write" -- Reserved token
+        expr <- pExpr -- Recognise the expression
+        semi
+        return (Write expr)
+    )
 
+-- Parser for write string statements.
 pSWrite
   = do
-    reserved "write"
-    str <- pString
-    semi
-    return (SWrite str)
+      reserved "write" -- Reserved token
+      str <- pString -- Recognise the string
+      semi
+      return (SWrite str)
 
+-- Parser for call statements.
 pCall
   = do
-    reserved "call"
-    ident <- identifier
-    exprs <- parens (pExpr `sepBy` comma)
-    semi
-    return (Call ident exprs)
+      reserved "call" -- Reserved token
+      ident <- identifier -- Parse the identifier
+      exprs <- parens (pExpr `sepBy` comma) -- Parse the comma separated
+      semi                                  -- expression list surrounded by
+      return (Call ident exprs)             -- '(' and ')'.
 
+-- Parser for If and If Else statements
 pIf
   = do
+      -- Parse the common part "if <expr> then <stmt-list>"
       reserved "if"
       expr <- pExpr
       reserved "then"
       thsms <- many1 pStmt
-      elsms <- (
+      -- Parse the else part
+      elsms <-
         do
+          -- if exist token "else", parse else part.
           reserved "else"
           e <- many1 pStmt
           reserved "fi"
           return e
         <|>
+        -- if token "fi" followed, return empty list.
         do
           reserved "fi"
-          return [])
+          return []
       return (If expr thsms elsms)
 
+-- Parser for while statements
 pWhile
   = do
-    reserved "while"
-    expr <- pExpr
-    reserved "do"
-    stmts <- many1 pStmt
-    reserved "od"
-    return (While expr stmts)
+      reserved "while"
+      expr <- pExpr -- Parse expression
+      reserved "do"
+      stmts <- many1 pStmt -- Parse one or more statements
+      reserved "od"
+      return (While expr stmts)
 
-pIndex :: Parser Index
-pIndex = brackets (
-  try ( do
-      { e1 <- pExpr
-      ; lexeme (char ',')
-      ; e2 <- pExpr
-      ; return (DIndex e1 e2)
-      })
-    <|>
-      (do
-      { e <- pExpr
-      ; return (SIndex e)
-      })
-  )
-
-pIdent :: Parser Expr
-pIdent
-  = do
-    svar <- pStmtVar
-    return (Id svar)
-
-pConst :: Parser Expr
-pConst
-  = choice [pBool, pNum]
-
-
-pBool, pNum :: Parser Expr
-
-pBool
-  = do
-    { reserved "true"
-    ; return (BoolConst True)
-    }
-    <|>
-    do
-    { reserved "false"
-    ; return (BoolConst False)
-  }
-
-pNum
-  = lexeme (
-      try ( do
-          { n <- float
-          ; return (FloatConst (double2Float n :: Float))
-      })
-      <|>
-      ( do
-      { n <- natural
-      ; return (IntConst (fromInteger n :: Int))
-      })
-  )
-
+-- Parser for string
 pString :: Parser String
 pString
-  = lexeme (do
-    char '"'
-    str <- many (satisfy (not . (`elem` "\"\n\t")))
-    char '"'
-    return (str))
-    <?>
-    "string"
+  = lexeme (
+      do
+        -- String is surrounded by two '"' characters
+        char '"'
+        -- Parse characters except newline/tab characters and '"'
+        str <- many (satisfy (not . (`elem` "\"\n\t")))
+        char '"'
+        return (str)
+    )
 
-pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
+-- -----------------------------------------------------------------
+-- --  pExpr is the main parser for expressions. It wants to recognise
+-- --  any type of expression as specified in rules.
+-- -----------------------------------------------------------------
+pExpr, pOrExpr, pAndExpr, pNegExpr :: Parser Expr
+pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
+-- Parser for expressions, the first level is connected by "||"
 pExpr
   = chainl1 pOrExpr pOrOp
 
+-- Parser for Or expressions, the second level is connected by "&&"
 pOrExpr
   = chainl1 pAndExpr pAndOp
 
+-- Parser for And expressions, the third level is connected by '!'
 pAndExpr
-  -- = chainl1 pNegExpr pNegOp
-  = try ( do
-        { reservedOp "!"
-        ; expr <- pNegExpr
-        ; return (Neg expr)
-        })
+  = try (
+      do
+        reservedOp "!"
+        expr <- pNegExpr
+        return (Neg expr)
+    )
     <|>
     do
-    { pNegExpr
-    }
+      pNegExpr
 
+-- Parser for Neg expressions, the forth level is connected by Compare operators
 pNegExpr
   = chainl1 pComExpr pComOp
 
+-- Parser for Com expressions, the fifth level is connected by Term operators
 pComExpr
   = chainl1 pTerm pTermOp
 
+-- Parser for Term expressions, the sixth level is connected by Factor operators
 pTerm
   = chainl1 pFactor pFactorOp
 
+-- Parser for Factor expressions, the seventh level is connected by UMinus
 pFactor
-  = try (do
-        { reservedOp "-"
-        ; expr <- pFactor
-        ; return (UMinus expr)
-        })
+  = try (
+      do
+        reservedOp "-"
+        expr <- pFactor
+        return (UMinus expr)
+    )
     <|>
     do
-    { pBaseExpr
-    }
+      pBaseExpr
 
+-- Parser for Base expressions, the eighth level is (expr), statement variable
+-- or constant
 pBaseExpr
   = choice [parens pExpr, pIdent, pConst]
 
-pOrOp, pAndOp, pComOp :: Parser (Expr -> Expr -> Expr)
+pConst, pBool, pNum, pIdent :: Parser Expr
+
+-- Parser for int, float or bool constant
+pConst
+  = choice [pBool, pNum]
+
+-- Parser for bool constant
+pBool
+ = do
+     reserved "true"
+     return (BoolConst True)
+   <|>
+   do
+     reserved "false"
+     return (BoolConst False)
+
+-- Parser for int or float constant
+pNum
+  = try (
+      do
+        n <- float
+        return (FloatConst (double2Float n :: Float))
+    )
+    <|>
+    do
+      n <- natural
+      return (IntConst (fromInteger n :: Int))
+
+-- Parser for Id in expression
+pIdent
+  = do
+      svar <- pStmtVar
+      return (Id svar)
+
+pOrOp, pAndOp, pComOp, pTermOp, pFactorOp :: Parser (Expr -> Expr -> Expr)
+
+-- Parser for Or operator
 pOrOp
   = do
-    reservedOp "||"
-    return Or
+      reservedOp "||"
+      return Or
 
+-- Parser for And operator
 pAndOp
   = do
-    reservedOp "&&"
-    return And
+      reservedOp "&&"
+      return And
 
+-- Parser for Compare operators
 pComOp
-  = choice [pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp, pGreaterOp, pGreaterEqualOp]
+  = choice [pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp,
+            pGreaterOp, pGreaterEqualOp]
 
+-- Parser for Term operators
 pTermOp
   = choice [pAddOp, pMinusOp]
 
+-- Parser for Factor operators
 pFactorOp
   = choice [pMulOp, pDivOp]
 
-pEqualOp, pNotEqualOp, pLessOp, pLessEqualOp, pGreaterOp, pGreaterEqualOp :: Parser (Expr -> Expr -> Expr)
+pEqualOp, pNotEqualOp, pLessOp :: Parser (Expr -> Expr -> Expr)
+pLessEqualOp, pGreaterOp, pGreaterEqualOp :: Parser (Expr -> Expr -> Expr)
 
+-- Parser for Equal operators
 pEqualOp
   = do
-    reservedOp "="
-    return Equal
+      reservedOp "="
+      return Equal
 
+-- Parser for Not Equal operators
 pNotEqualOp
   = do
-    reservedOp "!="
-    return NotEqual
+      reservedOp "!="
+      return NotEqual
 
+-- Parser for Less operators
 pLessOp
   = do
-    reservedOp "<"
-    return Less
+      reservedOp "<"
+      return Less
 
+-- Parser for Less Equal operators
 pLessEqualOp
   = do
-    reservedOp "<="
-    return LessEqual
+      reservedOp "<="
+      return LessEqual
 
+-- Parser for Greater operators
 pGreaterOp
   = do
-    reservedOp ">"
-    return Greater
+      reservedOp ">"
+      return Greater
 
+-- Parser for Greater Equal operators
 pGreaterEqualOp
   = do
-    reservedOp ">="
-    return GreaterEqual
+      reservedOp ">="
+      return GreaterEqual
 
 pAddOp, pMinusOp, pMulOp, pDivOp :: Parser (Expr -> Expr -> Expr)
 
+-- Parser for Add operators
 pAddOp
   = do
-    reservedOp "+"
-    return Add
+      reservedOp "+"
+      return Add
 
+-- Parser for Minus operators
 pMinusOp
   = do
-    reservedOp "-"
-    return Minus
+      reservedOp "-"
+      return Minus
 
+-- Parser for Mul operators
 pMulOp
   = do
-    reservedOp "*"
-    return Mul
+      reservedOp "*"
+      return Mul
 
+-- Parser for Div operators
 pDivOp
   = do
-    reservedOp "/"
-    return Div
+      reservedOp "/"
+      return Div
 
+-- Main Parser
 pMain :: Parser GoatProg
 pMain
   = do
-      whiteSpace
-      p <- pProg
-      eof
+      whiteSpace -- Remove white space in front of the program
+      p <- pProg -- Parse the Goat program
+      eof -- End of File
       return p
 
+-- Provided by Harald Sondergaard
 main :: IO ()
 main
   = do
@@ -457,7 +533,6 @@ main
             case output of
               Right ast -> do { print ast
                               ; putStrLn ""
-                              -- ; putStr $ progToString ast
                               }
               Left  err -> do { putStr "Parse error at "
                               ; print err
@@ -469,12 +544,13 @@ main
             input <- readFile filename
             let output = runParser pMain () "" input
             case output of
-              Right ast -> putStr $ progToString ast
+              Right ast -> putStr $ progToStr ast
               Left  err -> do { putStr "Parse error at "
                               ; print err
                               ; exitWith (ExitFailure 2)
                               }
 
+-- Provided by Harald Sondergaard
 checkArgs :: String -> [String] -> IO Task
 checkArgs _ ['-':_]
   = do
