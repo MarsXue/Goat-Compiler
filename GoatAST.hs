@@ -7,7 +7,7 @@ module GoatAST where
 -- Identifier: string
 type Ident = String
 
--- Parameter indicator: val, ref
+-- Parameter indicator: value, reference
 data Indicator
   = Val
   | Ref
@@ -22,14 +22,14 @@ data BaseType
 
 -- Shape (int) for array and matrix in declaration
 data Shape
-  = SShape Int          -- array [n]
-  | DShape Int Int      -- matrix [m, n]
+  = SShape Int          -- array  [n]
+  | DShape Int Int      -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Shape (expr) for array and matrix in statement
 data Index
-  = SIndex Expr         -- array [n] 
-  | DIndex Expr Expr    -- matrix [m, n]
+  = SIndex Expr         -- array  [n] 
+  | DIndex Expr Expr    -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Declaration variable
@@ -52,11 +52,11 @@ data StmtVar
 data Expr
   -- Identifier
   = Id StmtVar
-  -- Constant type
+  -- Constant expression
   | BoolConst Bool
   | IntConst Int
   | FloatConst Float
-  -- Binary operation
+  -- Binary operation expression
   | Add Expr Expr
   | Minus Expr Expr
   | Mul Expr Expr
@@ -69,7 +69,7 @@ data Expr
   | LessEqual Expr Expr
   | Greater Expr Expr
   | GreaterEqual Expr Expr
-  -- Unary operation
+  -- Unary operation expression
   | Neg Expr
   | UMinus Expr
   deriving (Show, Eq)
@@ -87,18 +87,18 @@ data Stmt
   -- Expr:    expression
   -- Ident:   identifier
   -- Stmt:    statement
-  = Assign StmtVar Expr     -- <stmtvar> := <expr>;
-  | Read StmtVar            -- read <stmtvar>;
-  | Write Expr              -- write <expr>;
-  | SWrite String           -- write <string>;
-  | Call Ident [Expr]       -- call <id> (<expr-list>);
-  | If Expr [Stmt] [Stmt]   -- if <expr> then <stmt-list> else <stmt-list> fi
-  | While Expr [Stmt]       -- while <expr> do <stmt-list> od
+  = Assign StmtVar Expr   -- <stmtvar> := <expr>;
+  | Read StmtVar          -- read <stmtvar>;
+  | Write Expr            -- write <expr>;
+  | SWrite String         -- write <string>;
+  | Call Ident [Expr]     -- call <id> (<expr-list>);
+  | If Expr [Stmt] [Stmt] -- if <expr> then <stmt-list> else <stmt-list> fi
+  | While Expr [Stmt]     -- while <expr> do <stmt-list> od
   deriving (Show, Eq)
 
 -- Parameter
 data Param
-  -- Indicator: Indicator (val or ref)
+  -- Indicator: indicator
   -- BaseType:  base type
   -- Ident:     identifier
   = Param Indicator BaseType Ident
@@ -115,7 +115,6 @@ data Proc
 
 -- Goar Program
 data GoatProg
-  -- Args
   -- [Proc]: list of procedures
   = Prog [Proc]
   deriving (Show, Eq)
