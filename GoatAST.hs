@@ -22,14 +22,14 @@ data BaseType
 
 -- Shape (int) for array and matrix in declaration
 data Shape
-  = SShape Int          -- array  [n]
-  | DShape Int Int      -- matrix [m,n]
+  = SArray Int          -- array  [n]
+  | SMatrix Int Int      -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Shape (expr) for array and matrix in statement
 data Index
-  = SIndex Expr         -- array  [n] 
-  | DIndex Expr Expr    -- matrix [m,n]
+  = IArray Expr         -- array  [n]
+  | IMatrix Expr Expr    -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Declaration variable

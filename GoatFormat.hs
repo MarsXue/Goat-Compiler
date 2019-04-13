@@ -13,7 +13,7 @@ progToStr (Prog (p:procs))
 procToStr :: Proc -> String
 procToStr (Proc ident params decls stmts)
   -- TOKEN "proc"
-  = "proc " 
+  = "proc "
   -- Header with identifier and parameters in parentheses
   ++ ident ++ " (" ++ paramsToStr params ++ ")\n"
   -- Declarations
@@ -70,8 +70,8 @@ declVarToStr (ShapeVar ident shape) = ident ++ shapeToStr shape
 
 -- Shape to String
 shapeToStr :: Shape -> String
-shapeToStr (SShape a)   = "[" ++ show a ++ "]"
-shapeToStr (DShape a b) = "[" ++ show a ++ "," ++ show b ++ "]"
+shapeToStr (SArray a)   = "[" ++ show a ++ "]"
+shapeToStr (SMatrix a b) = "[" ++ show a ++ "," ++ show b ++ "]"
 
 -- Statements to String (recursive)
 stmtsToStr :: Int -> [Stmt] -> String
@@ -135,8 +135,8 @@ stmtVarToStr (IndexVar ident index) = ident ++ indexToStr index
 
 -- Index to String
 indexToStr :: Index -> String
-indexToStr (SIndex expr) = "[" ++ exprToStr False expr ++ "]"
-indexToStr (DIndex expr1 expr2)
+indexToStr (IArray expr) = "[" ++ exprToStr False expr ++ "]"
+indexToStr (IMatrix expr1 expr2)
   = "[" ++ exprToStr False expr1 ++ "," ++ exprToStr False expr2 ++ "]"
 
 -- Expressions to String (recursive)

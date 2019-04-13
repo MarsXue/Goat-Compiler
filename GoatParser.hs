@@ -178,13 +178,13 @@ pShape
           n1 <- natural -- Parse the first integer.
           lexeme (char ',')
           n2 <- natural -- Parse the second integer.
-          return (DShape (fromInteger n1 :: Int) (fromInteger n2 :: Int))
+          return (SMatrix (fromInteger n1 :: Int) (fromInteger n2 :: Int))
       )
       <|>
       -- If fail, recognise shape as an array.
       do
         n <- natural -- Parse the integer.
-        return (SShape (fromInteger n :: Int))
+        return (SArray (fromInteger n :: Int))
     )
 
 -- Parser for index
@@ -198,13 +198,13 @@ pIndex
           e1 <- pExpr -- Parse the first expression.
           lexeme (char ',')
           e2 <- pExpr -- Parse the second expression.
-          return (DIndex e1 e2)
+          return (IMatrix e1 e2)
       )
       <|>
       -- If fail, recognise index as an array.
       do
         e <- pExpr -- Parse the expression.
-        return (SIndex e)
+        return (IArray e)
     )
 
 -- Parser for basetype: int, float, bool
