@@ -220,28 +220,6 @@ pCall
     semi
     return (Call ident exprs)
 
--- pIf
---   = try ( do
---     reserved "if"
---     expr <- pExpr
---     reserved "then"
---     stmts <- many1 pStmt
---     reserved "fi"
---     return (If expr stmts)
---   )
---
--- pIfElse
---   = try ( do
---     reserved "if"
---     expr <- pExpr
---     reserved "then"
---     thsms <- many1 pStmt
---     reserved "else"
---     elsms <- many1 pStmt
---     reserved "fi"
---     return (IfElse expr thsms elsms)
---   )
-
 pIf
   = do
       reserved "if"
@@ -328,6 +306,8 @@ pString
     str <- many (satisfy (not . (`elem` "\"\n\t")))
     char '"'
     return (str))
+    <?>
+    "string"
 
 pExpr, pOrExpr, pAndExpr, pNegExpr, pComExpr, pTerm, pFactor, pBaseExpr :: Parser Expr
 
