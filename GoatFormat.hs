@@ -3,212 +3,189 @@ module GoatFormat where
 import GoatAST
 
 -- Program to String
-progToString :: GoatProg -> String
-progToString (Prog []) = ""
-progToString (Prog (p:procs))
-  -- If procs is non-empty, there should be a newline
-  = procToString p ++ "\n" ++ progToString (Prog procs)
+progToStr :: GoatProg -> String
+progToStr (Prog []) = ""
+progToStr (Prog (p:procs))
+  -- There should be a newline between procedures
+  = procToStr p ++ "\n" ++ progToStr (Prog procs)
 
 -- Procedure to String
-procToString :: Proc -> String
-procToString (Proc ident params decls stmts)
+procToStr :: Proc -> String
+procToStr (Proc ident params decls stmts)
   -- TOKEN "proc"
   = "proc " 
   -- Header with identifier and parameters in parentheses
-  ++ ident ++ " (" ++ paramsToString params ++ ")\n"
+  ++ ident ++ " (" ++ paramsToStr params ++ ")\n"
   -- Declarations
-  ++ declsToString decls
+  ++ declsToStr decls
   -- TOKEN "begin"
   ++ "begin\n"
   -- Statements with one indentation level
-  ++ stmtsToString 1 stmts
+  ++ stmtsToStr 1 stmts
   -- TOKEN "end"
   ++ "end\n"
 
 -- Parameters to String (recursive)
-paramsToString :: [Param] -> String
-paramsToString [] = ""
+paramsToStr :: [Param] -> String
+paramsToStr []         = ""
 -- Last parameter
-paramsToString (p:[]) = (paramToString p)
+paramsToStr [p]        = paramToStr p
 -- Paramerter except the last one should be followed by a comma
-paramsToString (p:params)
-  = (paramToString p) ++ ", " ++ (paramsToString params)
+paramsToStr (p:params) = paramToStr p ++ ", " ++ paramsToStr params
 
 -- Parameter to String
-paramToString :: Param -> String
-paramToString (Param Val basetype ident)
-  = "val " ++ (baseTypeToString basetype) ++ " " ++ ident
-paramToString (Param Ref basetype ident)
-  = "ref " ++ (baseTypeToString basetype) ++ " " ++ ident
+paramToStr :: Param -> String
+paramToStr (Param Val basetype ident)
+  = "val " ++ baseTypeToStr basetype ++ " " ++ ident
+paramToStr (Param Ref basetype ident)
+  = "ref " ++ baseTypeToStr basetype ++ " " ++ ident
 
 -- Declarations to String (recursive)
-declsToString :: [Decl] -> String
-declsToString [] = ""
-declsToString (decl:decls)
-  = (declToString decl) ++ "\n" ++ (declsToString decls)
+declsToStr :: [Decl] -> String
+declsToStr []           = ""
+declsToStr (decl:decls) = declToStr decl ++ "\n" ++ declsToStr decls
 
 -- Declaration to String
-declToString :: Decl -> String
-declToString (Decl baseType declVar)
-  -- Declaration is default with 4 spaces indentation
+declToStr :: Decl -> String
+declToStr (Decl baseType declVar)
+  -- Declaration is default with 4 space indentation
   = "    "
   -- Base type for declaration
-  ++ baseTypeToString baseType
+  ++ baseTypeToStr baseType
   ++ " "
   -- Declaration variable with semi colon at the end
-  ++ declVarToString declVar ++ ";"
+  ++ declVarToStr declVar ++ ";"
 
 -- Base type to String
-baseTypeToString :: BaseType -> String
-baseTypeToString baseType
+baseTypeToStr :: BaseType -> String
+baseTypeToStr baseType
   | baseType == BoolType  = "bool"
   | baseType == IntType   = "int"
   | baseType == FloatType = "float"
 
 -- Declaration variable to String
-declVarToString :: DeclVar -> String
-declVarToString (DBaseVar ident) = ident
-declVarToString (ShapeVar ident shape)
-  = ident ++ shapeToString shape
+declVarToStr :: DeclVar -> String
+declVarToStr (DBaseVar ident)       = ident
+declVarToStr (ShapeVar ident shape) = ident ++ shapeToStr shape
 
 -- Shape to String
-shapeToString :: Shape -> String
-shapeToString (SShape a)
-  = "[" ++ (show a) ++ "]"
-shapeToString (DShape a b)
-  = "[" ++ (show a) ++ "," ++ (show b) ++ "]"
+shapeToStr :: Shape -> String
+shapeToStr (SShape a)   = "[" ++ show a ++ "]"
+shapeToStr (DShape a b) = "[" ++ show a ++ "," ++ show b ++ "]"
 
 -- Statements to String (recursive)
-stmtsToString :: Int -> [Stmt] -> String
-stmtsToString _ [] = ""
-stmtsToString a (s:stmts)
-  = (stmtToString a s) ++ (stmtsToString a stmts)
+stmtsToStr :: Int -> [Stmt] -> String
+stmtsToStr _ []           = ""
+stmtsToStr i (stmt:stmts) = stmtToStr i stmt ++ stmtsToStr i stmts
 
 -- Statement to String
-stmtToString :: Int -> Stmt -> String
+stmtToStr :: Int -> Stmt -> String
 -- Assign statement
-stmtToString a (Assign stmtVar expr)
-  = (spaces a) ++ (stmtVarToString stmtVar)
-  ++ " := " ++ (exprToString False expr) ++ ";\n"
+stmtToStr i (Assign stmtVar expr)
+  = space i ++ stmtVarToStr stmtVar ++ " := " ++ exprToStr False expr ++ ";\n"
 -- Read statement
-stmtToString a (Read stmtVar)
-  = (spaces a) ++ "read " ++ (stmtVarToString stmtVar) ++ ";\n"
+stmtToStr i (Read stmtVar)
+  = space i ++ "read " ++ stmtVarToStr stmtVar ++ ";\n"
 -- Write statement
-stmtToString a (Write expr)
-  = (spaces a) ++ "write " ++ (exprToString False expr) ++ ";\n"
+stmtToStr i (Write expr)
+  = space i ++ "write " ++ exprToStr False expr ++ ";\n"
 -- Write string statement
-stmtToString a (SWrite string)
-  = (spaces a) ++ "write \"" ++ string ++ "\";\n"
+stmtToStr i (SWrite string)
+  = space i ++ "write \"" ++ string ++ "\";\n"
 -- Call statement
-stmtToString a (Call ident exprs)
-  = (spaces a) ++ "call " ++ ident ++ (exprsToString exprs) ++ ";\n"
+stmtToStr i (Call ident exprs)
+  = space i ++ "call " ++ ident ++ exprsToStr exprs ++ ";\n"
 -- If statement
-stmtToString a (If expr stmts1 stmts2)
-  = (spaces a)
+stmtToStr i (If expr stmts1 stmts2)
+  = space i
   -- TOKEN "if"
   ++ "if "
-  ++ (exprToString False expr)
+  ++ exprToStr False expr
   -- TOKEN "then"
   ++ " then\n"
-  ++ (stmtsToString (a+1) stmts1)
+  ++ stmtsToStr (i + 1) stmts1
   -- If stmts2 is non-empty list, there is a else statement
   ++ rest
-  ++ (spaces a)
+  ++ space i
   -- TOKEN "fi"
   ++ "fi\n"
   where
-      rest
-        | length stmts2 == 0  = ""
-        | otherwise           =  (spaces a)
-                              -- TOKEN "else"
-                              ++ "else\n"
-                              ++ (stmtsToString (a+1) stmts2)
-stmtToString a (While expr stmts)
-  = (spaces a)
+    rest
+      | null stmts2 = ""
+      | otherwise   = space i
+                    -- TOKEN "else"
+                    ++ "else\n"
+                    ++ stmtsToStr (i + 1) stmts2
+stmtToStr i (While expr stmts)
+  = space i
   -- TOKEN "while"
   ++ "while "
-  ++ (exprToString False expr)
+  ++ exprToStr False expr
   -- TOKEN "do"
   ++ " do\n"
-  ++ (stmtsToString (a+1) stmts)
-  ++ (spaces a)
+  ++ stmtsToStr (i + 1) stmts
+  ++ space i
   -- TOKEN "od"
   ++ "od\n"
 
 -- Statement variable to String
-stmtVarToString :: StmtVar -> String
-stmtVarToString (SBaseVar ident) = ident
-stmtVarToString (IndexVar ident index) = ident ++ (indexToString index)
+stmtVarToStr :: StmtVar -> String
+stmtVarToStr (SBaseVar ident)       = ident
+stmtVarToStr (IndexVar ident index) = ident ++ indexToStr index
 
 -- Index to String
-indexToString :: Index -> String
-indexToString (SIndex expr)
-  = "[" ++ (exprToString False expr) ++ "]"
-indexToString (DIndex expr1 expr2)
-  = "[" ++ (exprToString False expr1) ++ ","
-  ++ (exprToString False expr2) ++ "]"
+indexToStr :: Index -> String
+indexToStr (SIndex expr) = "[" ++ exprToStr False expr ++ "]"
+indexToStr (DIndex expr1 expr2)
+  = "[" ++ exprToStr False expr1 ++ "," ++ exprToStr False expr2 ++ "]"
 
 -- Expressions to String (recursive)
-exprsToString :: [Expr] -> String
-exprsToString [] = ""
-exprsToString (e:exprs) = "(" ++ exprToString False e ++ rest
+exprsToStr :: [Expr] -> String
+exprsToStr [] = ""
+exprsToStr (e:exprs) = "(" ++ exprToStr False e ++ rest
   where
-      rest
-        | length exprs > 0 = ", " ++ exprsToString exprs
-        | otherwise        = ")"
+    rest
+      | not (null exprs) = ", " ++ exprsToStr exprs
+      | otherwise        = ")"
 
 -- Expression to String
-exprToString :: Bool -> Expr -> String
-exprToString _ (Id stmtVar) = stmtVarToString stmtVar
+exprToStr :: Bool -> Expr -> String
+exprToStr _ (Id stmtVar)                  = stmtVarToStr stmtVar
 -- Constant expression
-exprToString _ (BoolConst True) = "true"
-exprToString _ (BoolConst False) = "false"
-exprToString _ (IntConst int) = show int
-exprToString _ (FloatConst float) = show float
+exprToStr _ (BoolConst True)              = "true"
+exprToStr _ (BoolConst False)             = "false"
+exprToStr _ (IntConst int)                = show int
+exprToStr _ (FloatConst float)            = show float
 -- Binary operation expression
-exprToString bool (Add expr1 expr2)
-  = genBinopString bool " + " expr1 expr2
-exprToString bool (Minus expr1 expr2)
-  = genBinopString bool " - " expr1 expr2
-exprToString bool (Mul expr1 expr2)
-  = genBinopString bool " * " expr1 expr2
-exprToString bool (Div expr1 expr2)
-  = genBinopString bool " / " expr1 expr2
-exprToString bool (Or expr1 expr2)
-  = genBinopString bool " || " expr1 expr2
-exprToString bool (And expr1 expr2)
-  = genBinopString bool " && " expr1 expr2
-exprToString bool (Equal expr1 expr2)
-  = genBinopString bool " = " expr1 expr2
-exprToString bool (NotEqual expr1 expr2)
-  = genBinopString bool " != " expr1 expr2
-exprToString bool (Less expr1 expr2)
-  = genBinopString bool " < " expr1 expr2
-exprToString bool (LessEqual expr1 expr2)
-  = genBinopString bool " <= " expr1 expr2
-exprToString bool (Greater expr1 expr2)
-  = genBinopString bool " > " expr1 expr2
-exprToString bool (GreaterEqual expr1 expr2)
-  = genBinopString bool " >= " expr1 expr2
+exprToStr bool (Add expr1 expr2)          = binopToStr bool " + " expr1 expr2
+exprToStr bool (Minus expr1 expr2)        = binopToStr bool " - " expr1 expr2
+exprToStr bool (Mul expr1 expr2)          = binopToStr bool " * " expr1 expr2
+exprToStr bool (Div expr1 expr2)          = binopToStr bool " / " expr1 expr2
+exprToStr bool (Or expr1 expr2)           = binopToStr bool " || " expr1 expr2
+exprToStr bool (And expr1 expr2)          = binopToStr bool " && " expr1 expr2
+exprToStr bool (Equal expr1 expr2)        = binopToStr bool " = " expr1 expr2
+exprToStr bool (NotEqual expr1 expr2)     = binopToStr bool " != " expr1 expr2
+exprToStr bool (Less expr1 expr2)         = binopToStr bool " < " expr1 expr2
+exprToStr bool (LessEqual expr1 expr2)    = binopToStr bool " <= " expr1 expr2
+exprToStr bool (Greater expr1 expr2)      = binopToStr bool " > " expr1 expr2
+exprToStr bool (GreaterEqual expr1 expr2) = binopToStr bool " >= " expr1 expr2
 -- Unary operation expression
-exprToString _ (Neg expr)
-  = "!" ++ (exprToString True expr)
-exprToString _ (UMinus expr)
-  = "-" ++ (exprToString True expr)
+exprToStr _ (Neg expr)                    = "!" ++ exprToStr True expr
+exprToStr _ (UMinus expr)                 = "-" ++ exprToStr True expr
 
 ---------------------------------
 -- Helper function for GoatFormat
 ---------------------------------
 
 -- Generate binary operation string
-genBinopString :: Bool -> String -> Expr -> Expr -> String
-genBinopString bool symbol expr1 expr2
+binopToStr :: Bool -> String -> Expr -> Expr -> String
+binopToStr bool symbol expr1 expr2
   | bool      = "(" ++ middle ++ ")"
   | otherwise = middle
   where
-    middle = exprToString True expr1 ++ symbol ++ exprToString True expr2
+    middle = exprToStr True expr1 ++ symbol ++ exprToStr True expr2
 
--- Print spaces based on the input indentation level
-spaces :: Int -> String
-spaces 0 = ""
-spaces n = "    " ++ spaces (n-1)
+-- Print space based on the input indentation level
+space :: Int -> String
+space 0 = ""
+space n = "    " ++ space (n - 1)
