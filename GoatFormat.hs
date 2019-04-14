@@ -17,17 +17,17 @@ progToStr (Prog (p:procs))
 -- Procedure to String
 procToStr :: Proc -> String
 procToStr (Proc ident params decls stmts)
-  -- TOKEN "proc"
+  -- Reserved token "proc"
   = "proc "
   -- Header with identifier and parameters in parentheses
   ++ ident ++ " (" ++ paramsToStr params ++ ")\n"
   -- Declarations
   ++ declsToStr decls
-  -- TOKEN "begin"
+  -- Reserved token "begin"
   ++ "begin\n"
   -- Statements with one indentation level
   ++ stmtsToStr 1 stmts
-  -- TOKEN "end"
+  -- Reserved token "end"
   ++ "end\n"
 
 -- Parameters to String (recursive)
@@ -103,34 +103,34 @@ stmtToStr i (Call ident exprs)
 -- If statement
 stmtToStr i (If expr stmts1 stmts2)
   = space i
-  -- TOKEN "if"
+  -- Reserved token "if"
   ++ "if "
   ++ exprToStr False expr
-  -- TOKEN "then"
+  -- Reserved token "then"
   ++ " then\n"
   ++ stmtsToStr (i + 1) stmts1
   -- If stmts2 is non-empty list, there is a else statement
   ++ rest
   ++ space i
-  -- TOKEN "fi"
+  -- Reserved token "fi"
   ++ "fi\n"
   where
     rest
       | null stmts2 = ""
       | otherwise   = space i
-                    -- TOKEN "else"
+                    -- Reserved token "else"
                     ++ "else\n"
                     ++ stmtsToStr (i + 1) stmts2
 stmtToStr i (While expr stmts)
   = space i
-  -- TOKEN "while"
+  -- Reserved token "while"
   ++ "while "
   ++ exprToStr False expr
-  -- TOKEN "do"
+  -- Reserved token "do"
   ++ " do\n"
   ++ stmtsToStr (i + 1) stmts
   ++ space i
-  -- TOKEN "od"
+  -- Reserved token "od"
   ++ "od\n"
 
 -- Statement variable to String
