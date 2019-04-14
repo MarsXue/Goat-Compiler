@@ -71,7 +71,7 @@ declVarToStr (ShapeVar ident shape) = ident ++ shapeToStr shape
 -- Shape to String
 shapeToStr :: Shape -> String
 shapeToStr (SArray a)   = "[" ++ show a ++ "]"
-shapeToStr (SMatrix a b) = "[" ++ show a ++ "," ++ show b ++ "]"
+shapeToStr (SMatrix a b) = "[" ++ show a ++ ", " ++ show b ++ "]"
 
 -- Statements to String (recursive)
 stmtsToStr :: Int -> [Stmt] -> String
@@ -94,7 +94,7 @@ stmtToStr i (SWrite string)
   = space i ++ "write \"" ++ string ++ "\";\n"
 -- Call statement
 stmtToStr i (Call ident exprs)
-  = space i ++ "call " ++ ident ++ exprsToStr exprs ++ ";\n"
+  = space i ++ "call " ++ ident ++ "(" exprsToStr exprs ++ ");\n"
 -- If statement
 stmtToStr i (If expr stmts1 stmts2)
   = space i
@@ -137,16 +137,16 @@ stmtVarToStr (IndexVar ident index) = ident ++ indexToStr index
 indexToStr :: Index -> String
 indexToStr (IArray expr) = "[" ++ exprToStr False expr ++ "]"
 indexToStr (IMatrix expr1 expr2)
-  = "[" ++ exprToStr False expr1 ++ "," ++ exprToStr False expr2 ++ "]"
+  = "[" ++ exprToStr False expr1 ++ ", " ++ exprToStr False expr2 ++ "]"
 
 -- Expressions to String (recursive)
 exprsToStr :: [Expr] -> String
 exprsToStr [] = ""
-exprsToStr (e:exprs) = "(" ++ exprToStr False e ++ rest
+exprsToStr (e:exprs) = exprToStr False e ++ rest
   where
     rest
       | not (null exprs) = ", " ++ exprsToStr exprs
-      | otherwise        = ")"
+      | otherwise        = ""
 
 -- Expression to String
 exprToStr :: Bool -> Expr -> String
