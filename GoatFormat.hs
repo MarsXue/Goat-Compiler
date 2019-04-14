@@ -10,6 +10,7 @@ import GoatAST
 -- Program to String
 progToStr :: GoatProg -> String
 progToStr (Prog []) = ""
+progToStr (Prog [p]) = procToStr p
 progToStr (Prog (p:procs))
   -- There should be a newline between procedures
   = procToStr p ++ "\n" ++ progToStr (Prog procs)
@@ -99,7 +100,7 @@ stmtToStr i (SWrite string)
   = space i ++ "write \"" ++ string ++ "\";\n"
 -- Call statement
 stmtToStr i (Call ident exprs)
-  = space i ++ "call " ++ ident ++ "(" exprsToStr exprs ++ ");\n"
+  = space i ++ "call " ++ ident ++ "(" ++ exprsToStr exprs ++ ");\n"
 -- If statement
 stmtToStr i (If expr stmts1 stmts2)
   = space i
