@@ -1,3 +1,8 @@
+---------------------------------------------------------
+-- Programming Language Implementation COMP90045 Project1
+-- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
+---------------------------------------------------------
+
 module GoatAST where
 
 -----------------------------------
@@ -23,19 +28,19 @@ data BaseType
 -- Shape (int) for array and matrix in declaration
 data Shape
   = SArray Int          -- array  [n]
-  | SMatrix Int Int      -- matrix [m,n]
+  | SMatrix Int Int     -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Shape (expr) for array and matrix in statement
 data Index
   = IArray Expr         -- array  [n]
-  | IMatrix Expr Expr    -- matrix [m,n]
+  | IMatrix Expr Expr   -- matrix [m,n]
   deriving (Show, Eq)
 
 -- Declaration variable
 data DeclVar
   -- Ident: identifier
-  -- Shape: declaration shape (int)
+  -- Shape: declaration shape <int>
   = DBaseVar Ident
   | ShapeVar Ident Shape
   deriving (Show, Eq)
@@ -43,7 +48,7 @@ data DeclVar
 -- Statement variable
 data StmtVar
   -- Ident: identifier
-  -- Index: statement shape (expr)
+  -- Index: statement shape <expr>
   = SBaseVar Ident
   | IndexVar Ident Index
   deriving (Show, Eq)
