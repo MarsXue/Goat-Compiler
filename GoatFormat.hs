@@ -1,3 +1,8 @@
+---------------------------------------------------------
+-- Programming Language Implementation COMP90045 Project1
+-- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
+---------------------------------------------------------
+
 module GoatFormat where
 
 import GoatAST
