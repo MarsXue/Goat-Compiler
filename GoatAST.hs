@@ -59,8 +59,8 @@ data Expr
   = Id StmtVar
   -- Constant expression
   | BoolConst Bool
-  | IntConst Int
-  | FloatConst Float
+  | IntConst Integer
+  | FloatConst Double
   -- Binary operation expression
   | Add Expr Expr
   | Minus Expr Expr

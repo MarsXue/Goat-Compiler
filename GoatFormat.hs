@@ -6,6 +6,7 @@
 module GoatFormat where
 
 import GoatAST
+import Numeric
 
 -- Program to String
 progToStr :: GoatProg -> String
@@ -161,7 +162,7 @@ exprToStr _ (Id stmtVar)                  = stmtVarToStr stmtVar
 exprToStr _ (BoolConst True)              = "true"
 exprToStr _ (BoolConst False)             = "false"
 exprToStr _ (IntConst int)                = show int
-exprToStr _ (FloatConst float)            = show float
+exprToStr _ (FloatConst float)            = showFFloat Nothing float ""
 -- Binary operation expression
 exprToStr bool (Add expr1 expr2)          = binopToStr bool " + " expr1 expr2
 exprToStr bool (Minus expr1 expr2)        = binopToStr bool " - " expr1 expr2

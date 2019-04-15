@@ -476,13 +476,13 @@ pNum
   = try (
       do
         n <- float
-        return (FloatConst (double2Float n :: Float))
+        return (FloatConst n)
     )
     <|>
     -- Otherwise parse into int type
     do
       n <- natural
-      return (IntConst (fromInteger n :: Int))
+      return (IntConst n)
 
 -- Parser for Id in expression
 pIdent
