@@ -274,7 +274,7 @@ pStmt
 pAssign
   = do
       -- Recognise the left value
-      lvalue <- pStmtVar 
+      lvalue <- pStmtVar
       -- Reserved operator ":="
       reservedOp ":="
       -- Parse the assigned expression
@@ -421,8 +421,16 @@ pAndExpr
 
 -- Parser for Neg expressions, the 4th level is connected by Compare operators
 pNegExpr
-  = chainl1 pComExpr pComOp
-
+  = try (
+      do
+        c1 <- pComExpr
+        co <- pComOp
+        c2 <- pComExpr
+        return (co c1 c2)
+    )
+    <|>
+    do
+      pComExpr
 -- Parser for Com expressions, the 5th level is connected by Term operators
 pComExpr
   = chainl1 pTerm pTermOp
@@ -444,7 +452,7 @@ pFactor
     do
       pBaseExpr
 
--- Parser for Base expressions, 
+-- Parser for Base expressions,
 -- the 8th level is (expr), statement variable or constant
 pBaseExpr
   = choice [parens pExpr,
@@ -508,11 +516,11 @@ pAndOp
 
 -- Parser for Compare operators
 pComOp
-  = choice [pEqualOp, 
-            pNotEqualOp, 
-            pLessOp, 
+  = choice [pEqualOp,
+            pNotEqualOp,
+            pLessOp,
             pLessEqualOp,
-            pGreaterOp, 
+            pGreaterOp,
             pGreaterEqualOp]
 
 -- Parser for Term operators
@@ -634,7 +642,7 @@ main
             input <- readFile filename
             let output = runParser pMain () "" input
             case output of
-              Right ast -> do 
+              Right ast -> do
                               print ast
                               putStrLn ""
               Left  err -> do
