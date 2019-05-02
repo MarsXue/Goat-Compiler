@@ -1,7 +1,3 @@
-# GoatLexer: GoatLexer.x
-# 	alex GoatLexer.x
-# 	ghc -o GoatLexer GoatLexer.hs
-
 Goat: GoatParser.hs GoatAST.hs
 	ghc -o Goat GoatParser.hs
 
