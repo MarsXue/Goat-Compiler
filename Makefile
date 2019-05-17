@@ -3,8 +3,8 @@ Goat: GoatParser.hs GoatAST.hs
 
 test:
 	./Goat -p GoatTest/a.gt
-	./Goat -a sample.gt
-	./Goat -p sample.gt
+	./Goat -a GoatTest/sample.gt
+	./Goat -p GoatTest/sample.gt
 
 clean:
 	rm -f *.o *.hi
