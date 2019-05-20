@@ -3,7 +3,7 @@
 -- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
 ---------------------------------------------------------
 
-module Main where
+module GoatParser (ast) where
 
 import GoatFormat
 import GoatAST
@@ -18,10 +18,6 @@ import Data.Text
 
 type Parser a
   = Parsec String () a
-
-data Task
-  = Compile | Pprint | Parse
-  deriving (Show, Eq)
 
 lexer :: Q.TokenParser ()
 lexer
@@ -621,61 +617,6 @@ pMain
       eof
       return p
 
--- Code is provided by Harald Sondergaard, with modification
-main :: IO ()
-main
-  = do
-      progname <- getProgName
-      args <- getArgs
-      task <- checkArgs progname args
-      -- Stage 3 task
-      if task == Compile then
-        do
-          putStrLn "Sorry, cannot generate code yet"
-          exitWith ExitSuccess
-      else
-        -- Print AST
-        if task == Parse then
-          do
-            let [_, filename] = args
-            -- Read file name
-            input <- readFile filename
-            let output = runParser pMain () "" input
-            case output of
-              Right ast -> do
-                              print ast
-                              putStrLn ""
-              Left  err -> do
-                              putStr "Parse error at "
-                              print err
-                              exitWith (ExitFailure 2)
-        else
-          -- Pretty printer
-          do
-            let [_, filename] = args
-            -- Read file name
-            input <- readFile filename
-            let output = runParser pMain () "" input
-            case output of
-              Right ast -> putStr $ progToStr ast
-              Left  err -> do
-                              putStr "Parse error at "
-                              print err
-                              exitWith (ExitFailure 2)
-
--- Code is provided by Harald Sondergaard
-checkArgs :: String -> [String] -> IO Task
-checkArgs _ ['-':_]
-  = do
-      putStrLn ("Missing filename")
-      exitWith (ExitFailure 1)
-checkArgs _ [filename]
-  = return Compile
-checkArgs _ ["-p", filename]
-  = return Pprint
-checkArgs _ ["-a", filename]
-  = return Parse
-checkArgs progname _
-  = do
-      putStrLn ("Usage: " ++ progname ++ " [-p] filename")
-      exitWith (ExitFailure 1)
+ast :: String -> Either ParseError GoatProg
+ast input
+  = runParser pMain () "" input
