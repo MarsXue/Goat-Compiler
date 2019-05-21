@@ -1,6 +1,6 @@
 module GoatCompiler (test) where
 
-import Control.Monad.State  
+import Control.Monad.State
 import Data.Map (
     Map,
     (!),
@@ -8,7 +8,7 @@ import Data.Map (
 import qualified Data.Map as Map
 import GoatAST
 
-data SymTable = SymTable 
+data SymTable = SymTable
     { labelCounter :: Int
     , slotCounter  :: Int
     , regCounter   :: Int
@@ -18,9 +18,8 @@ data SymTable = SymTable
     } deriving (Show)
 
 
-
 nextAvaliableSlot :: State SymTable Int
-nextAvaliableSlot 
+nextAvaliableSlot
     = do
         st <- get
         let slot = slotCounter st
@@ -34,12 +33,12 @@ nextAvaliableReg
         let reg = regCounter st
         if reg > 1023
             then error $ "number of register exceeds 1023"
-            else 
+            else
                 do
                     put $ st {regCounter = (reg + 1)}
                     return reg
 
-        
+
 
 
 compileProg :: GoatProg -> State SymTable ()
@@ -47,7 +46,7 @@ compileProg (Prog ps)
     = do
         putProcedures ps
         checkMain
-
+        compileProcedures ps
 
 checkMain :: State SymTable ()
 checkMain
@@ -55,7 +54,7 @@ checkMain
         st <- get
         let main = Map.lookup "main" (procedures st)
         case main of
-            Nothing 
+            Nothing
                 -> do
                     error $ "lack of main procedure"
             Just params
@@ -63,7 +62,7 @@ checkMain
                     if (length params) /= 0
                         then error $ "parameters in main procedure"
                         else return ()
-        
+
 
 
 
@@ -75,7 +74,7 @@ putProcedures (p:ps)
         putProcedures ps
 
 putProcedure :: Proc -> State SymTable ()
-putProcedure (Proc ident params _ _) 
+putProcedure (Proc ident params _ _)
     = do
         st <- get
         let types = map (\(Param _ bt _) -> bt) params
