@@ -84,7 +84,6 @@ putProcedure (Proc ident params _ _)
             else put $ st { procedures = Map.insert ident types (procedures st) }
         return ()
 
--- compileProcedures :: [Proc] -> State SymTable     
 
 
 
