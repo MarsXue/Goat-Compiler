@@ -27,6 +27,20 @@ nextAvaliableSlot
         put $ st {slotCounter = (slot + 1)}
         return slot
 
+nextAvaliableReg :: State SymTable Int
+nextAvaliableReg
+    = do
+        st <- get
+        let reg = regCounter st
+        if reg > 1023
+            then error $ "number of register exceeds 1023"
+            else 
+                do
+                    put $ st {regCounter = (reg + 1)}
+                    return reg
+
+        
+
 
 compileProg :: GoatProg -> State SymTable ()
 compileProg (Prog ps)
@@ -39,9 +53,18 @@ checkMain :: State SymTable ()
 checkMain
     = do
         st <- get
-        if Map.member "main" (procedures st)
-            then return ()
-            else error $ "no main procedure "
+        let main = Map.lookup "main" (procedures st)
+        case main of
+            Nothing 
+                -> do
+                    error $ "lack of main procedure"
+            Just params
+                -> do
+                    if (length params) /= 0
+                        then error $ "parameters in main procedure"
+                        else return ()
+        
+
 
 
 putProcedures :: [Proc] -> State SymTable ()
@@ -61,6 +84,7 @@ putProcedure (Proc ident params _ _)
             else put $ st { procedures = Map.insert ident types (procedures st) }
         return ()
 
+-- compileProcedures :: [Proc] -> State SymTable     
 
 
 
