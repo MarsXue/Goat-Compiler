@@ -1,5 +1,5 @@
-Goat: GoatParser.hs GoatAST.hs
-	ghc -o Goat GoatParser.hs
+Goat: Goat.hs GoatParser.hs GoatAST.hs GoatFormat.hs
+	ghc -o Goat Goat.hs
 
 test:
 	./Goat -p GoatTest/a.gt

@@ -3,7 +3,7 @@
 -- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
 ---------------------------------------------------------
 
-module GoatFormat where
+module GoatFormat (progToStr) where
 
 import GoatAST
 import Numeric
