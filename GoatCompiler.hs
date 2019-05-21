@@ -1,3 +1,5 @@
+module GoatCompiler (test) where
+
 import Control.Monad.State  
 import Data.Map (
     Map,
@@ -63,5 +65,5 @@ putProcedure (Proc ident params _ _)
 
 
 
-test :: ((), SymTable)
-test = runState (compileProg (Prog [Proc "g" [Param Val FloatType "x",Param Ref IntType "k"] [Decl IntType (DBaseVar "n"),Decl FloatType (DBaseVar "y"),Decl BoolType (ShapeVar "a" (SArray 8))] [Assign (IndexVar "a" (IArray (IntConst 7))) (BoolConst True),Assign (SBaseVar "k") (IntConst 42)],Proc "p" [Param Ref IntType "i"] [] [Assign (SBaseVar "i") (Minus (Add (Mul (IntConst 6) (Id (SBaseVar "i"))) (IntConst 4)) (Id (SBaseVar "i")))],Proc "main" [] [Decl IntType (DBaseVar "m"),Decl IntType (DBaseVar "n")] [Read (SBaseVar "n"),While (Greater (Id (SBaseVar "n")) (IntConst 1)) [Assign (SBaseVar "m") (Id (SBaseVar "n")),While (Greater (Id (SBaseVar "m")) (IntConst 0)) [If (Greater (Id (SBaseVar "m")) (IntConst 0)) [Assign (SBaseVar "n") (Minus (Id (SBaseVar "n")) (IntConst 1)),Assign (SBaseVar "m") (Minus (Id (SBaseVar "m")) (IntConst 1)),If (Equal (Id (SBaseVar "m")) (IntConst 0)) [Call "p" [Id (SBaseVar "n")]] []] [Assign (SBaseVar "m") (Minus (Id (SBaseVar "n")) (Id (SBaseVar "m"))),Assign (SBaseVar "m") (Minus (Id (SBaseVar "m")) (IntConst 1))]]]]])) (SymTable { labelCounter = 0, slotCounter = 0, regCounter = 0, procedures = Map.empty })
+test :: GoatProg -> ((), SymTable)
+test prog  = runState (compileProg prog) (SymTable { labelCounter = 0, slotCounter = 0, regCounter = 0, procedures = Map.empty })

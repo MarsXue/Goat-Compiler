@@ -6,6 +6,7 @@
 module Main (main) where
 
 import GoatParser (ast)
+import GoatCompiler (test)
 import GoatFormat (progToStr)
 import System.Environment (getProgName, getArgs)
 import System.Exit (exitWith, ExitCode(..))
@@ -23,8 +24,17 @@ main
       case task of
         Compile
           -> do
-                putStrLn "Sorry, cannot generate code yet"
-                exitWith ExitSuccess
+            let [filename] = args
+            -- Read file name
+            input <- readFile filename
+            let output = ast input
+            case output of
+              Right tree -> do
+                              putStr $ show (test tree)
+              Left   err -> do
+                              putStr "Parse error at "
+                              print err
+                              exitWith (ExitFailure 2)
         Parse
           -> do
                 let [_, filename] = args
