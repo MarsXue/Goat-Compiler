@@ -18,7 +18,6 @@ data SymTable = SymTable
     } deriving (Show)
 
 
-
 nextAvaliableSlot :: State SymTable Int
 nextAvaliableSlot 
     = do
@@ -33,7 +32,7 @@ compileProg (Prog ps)
     = do
         putProcedures ps
         checkMain
-
+        compileProcedures ps
 
 checkMain :: State SymTable ()
 checkMain
@@ -61,6 +60,17 @@ putProcedure (Proc ident params _ _)
             else put $ st { procedures = Map.insert ident types (procedures st) }
         return ()
 
+compileProcedures :: [Proc] -> State SymTable ()
+compileProcedures [] = return ()
+compileProcedures (p:ps)
+    = do
+        compileProcedure p
+        compileProcedures ps
+
+compileProcedure :: Proc -> State SymTable ()
+compileProcedure (Proc ident params decls stmts)
+    = do
+        
 
 
 
