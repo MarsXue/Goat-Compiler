@@ -1,6 +1,6 @@
 module GoatCompiler (test) where
 
-import Control.Monad.State  
+import Control.Monad.State
 import Data.Map (
     Map,
     (!),
@@ -8,7 +8,7 @@ import Data.Map (
 import qualified Data.Map as Map
 import GoatAST
 
-data SymTable = SymTable 
+data SymTable = SymTable
     { labelCounter :: Int
     , slotCounter  :: Int
     , regCounter   :: Int
@@ -19,12 +19,26 @@ data SymTable = SymTable
 
 
 nextAvaliableSlot :: State SymTable Int
-nextAvaliableSlot 
+nextAvaliableSlot
     = do
         st <- get
         let slot = slotCounter st
         put $ st {slotCounter = (slot + 1)}
         return slot
+
+nextAvaliableReg :: State SymTable Int
+nextAvaliableReg
+    = do
+        st <- get
+        let reg = regCounter st
+        if reg > 1023
+            then error $ "number of register exceeds 1023"
+            else
+                do
+                    put $ st {regCounter = (reg + 1)}
+                    return reg
+
+
 
 
 compileProg :: GoatProg -> State SymTable ()
@@ -38,9 +52,18 @@ checkMain :: State SymTable ()
 checkMain
     = do
         st <- get
-        if Map.member "main" (procedures st)
-            then return ()
-            else error $ "no main procedure "
+        let main = Map.lookup "main" (procedures st)
+        case main of
+            Nothing
+                -> do
+                    error $ "lack of main procedure"
+            Just params
+                -> do
+                    if (length params) /= 0
+                        then error $ "parameters in main procedure"
+                        else return ()
+
+
 
 
 putProcedures :: [Proc] -> State SymTable ()
@@ -51,7 +74,7 @@ putProcedures (p:ps)
         putProcedures ps
 
 putProcedure :: Proc -> State SymTable ()
-putProcedure (Proc ident params _ _) 
+putProcedure (Proc ident params _ _)
     = do
         st <- get
         let types = map (\(Param _ bt _) -> bt) params
@@ -70,7 +93,7 @@ compileProcedures (p:ps)
 compileProcedure :: Proc -> State SymTable ()
 compileProcedure (Proc ident params decls stmts)
     = do
-        
+
 
 
 
