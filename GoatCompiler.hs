@@ -18,16 +18,16 @@ data SymTable = SymTable
     } deriving (Show)
 
 
-nextAvaliableSlot :: State SymTable Int
-nextAvaliableSlot
+nextAvailableSlot :: State SymTable Int
+nextAvailableSlot
     = do
         st <- get
         let slot = slotCounter st
         put $ st {slotCounter = (slot + 1)}
         return slot
 
-nextAvaliableReg :: State SymTable Int
-nextAvaliableReg
+nextAvailableReg :: State SymTable Int
+nextAvailableReg
     = do
         st <- get
         let reg = regCounter st
@@ -38,15 +38,25 @@ nextAvaliableReg
                     put $ st {regCounter = (reg + 1)}
                     return reg
 
-
+nextAvailableLabel :: State SymTable Int
+nextAvailableLabel
+    = do
+        st <- get
+        let label = labelCounter st
+        put $ st {labelCounter = (label + 1)}
+        return label
 
 
 compileProg :: GoatProg -> State SymTable ()
 compileProg (Prog ps)
     = do
+        nextAvailableLabel
+        nextAvailableLabel
+        nextAvailableLabel
+        nextAvailableLabel
         putProcedures ps
         checkMain
-        compileProcedures ps
+
 
 checkMain :: State SymTable ()
 checkMain
@@ -62,8 +72,6 @@ checkMain
                     if (length params) /= 0
                         then error $ "parameters in main procedure"
                         else return ()
-
-
 
 
 putProcedures :: [Proc] -> State SymTable ()
@@ -84,7 +92,14 @@ putProcedure (Proc ident params _ _)
         return ()
 
 
+-- compileProcedures :: [Proc] -> State SymTable ()
+-- compileProcedures (p:ps)
+--     = do
+--         compileProcedure p
+--         compileProcedures ps
 
+-- compileProcedure :: Proc -> State SymTable ()
+-- compileProcedure 
 
 
 test :: GoatProg -> ((), SymTable)
