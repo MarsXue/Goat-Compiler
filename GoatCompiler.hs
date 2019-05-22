@@ -61,7 +61,7 @@ nextAvailableLabel
         put $ st {labelCounter = (label + 1)}
         return label
 
-insertProcedure :: String -> [BaseType] -> State SymTable ()
+insertProcedure :: String -> [(Bool, BaseType)] -> State SymTable ()
 insertProcedure ident types
     = do
         st <- get
@@ -246,7 +246,6 @@ putAssignCode (IndexVar ident (IArray expr)) reg
                     addrReg <- nextAvailableReg
                     putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show slot ++ "\n"
                     putCode $ "    sub_offset" ++ 
-
             else error $ "array index is not Int"
 
 
@@ -393,17 +392,23 @@ compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
     = do
         exprType <- compileExpr n e
-        paramType <- getParameter ident n
-        -- type checking (actual && formal)
+        (isVar, paramType) <- getParameter ident n
+        -- Type checking (actual && formal)
         if exprType == paramType
             then
-                compileExprs ident (n+1) es
+                case isVar of
+                    -- Call by value
+                    True
+                        -> compileExprs ident (n+1) es
+                    -- Call be reference
+                    False
+                        -> return ()
             else
                 error $ show (n+1) ++ " th parameter type is not matched"
 
 
 -- Get the parameter by procedure and index
-getParameter :: String -> Int -> State SymTable (BaseType)
+getParameter :: String -> Int -> State SymTable (Bool, BaseType)
 getParameter ident idx
     = do
         st <- get
