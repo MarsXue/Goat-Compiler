@@ -153,9 +153,9 @@ compileProcedure (Proc ident params decls stmts)
 
 
         -- put statements
-        putComments "Compile Statements"
-        putStatements stmts
-        resetReg
+        -- putComments "Compile Statements"
+        -- putStatements stmts
+        -- resetReg
 
         -- put epilogue
         putProcedureEpilogue stackSize
@@ -425,7 +425,7 @@ compileExpr a (Greater expr1 expr2) = return BoolType
 compileExpr a (GreaterEqual expr1 expr2) = return BoolType
 compileExpr a (Neg expr) = return BoolType
 compileExpr a (UMinus expr) = return FloatType
-
+compileExpr a (Id b) = return IntType
 
 
 ----------- Parameters Helper -----------
