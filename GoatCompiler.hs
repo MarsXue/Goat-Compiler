@@ -61,7 +61,7 @@ nextAvailableLabel
         put $ st {labelCounter = (label + 1)}
         return label
 
-insertProcedure :: String -> [BaseType] -> State SymTable ()
+insertProcedure :: String -> [(Bool, BaseType)] -> State SymTable ()
 insertProcedure ident types
     = do
         st <- get
@@ -263,7 +263,7 @@ putSetOffsetReg offsetReg colReg col
     = do
         sizeReg <- nextAvailableReg
         putCode $ "int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
-        putCode $ "mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ sizeReg ++ "\n"
+        putCode $ "mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
         putCode $ "add_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
 
 putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
@@ -286,7 +286,8 @@ compileStmt (Assign stmtVar expr)
     = do
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
-        if assginableType (getStmtVarBaseType stmtVar) exprType 
+        stmtType <- getStmtVarBaseType stmtVar
+        if assginableType stmtType exprType 
             then putAssignCode stmtVar regThis
             else error $ "assginment type dose not match" 
 ---------------------------------------------------------------------------------------------------------------------
@@ -440,17 +441,17 @@ compileExpr :: Int -> Expr -> State SymTable BaseType
 compileExpr reg (BoolConst b)
     = do
         let boolint = if b then 1 else 0
-        putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint)
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint ++ "\n")
         return BoolType
 
 compileExpr reg (IntConst i)
     = do
-        putCode ("    int_const r" ++ show reg ++ ", " ++ show i)
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show i ++ "\n")
         return IntType
 
 compileExpr reg (FloatConst f)
     = do
-        putCode ("    real_const r" ++ show reg ++ ", " ++ show f)
+        putCode ("    real_const r" ++ show reg ++ ", " ++ show f ++ "\n")
         return FloatType
 
 compileExpr a (Add expr1 expr2)
@@ -470,7 +471,7 @@ compileExpr a (Add expr1 expr2)
                             putCode ("    add_real r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
                             return FloatType
                 else
-                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2
+                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2 ++ "\n"
         else
             if type1 == IntType && type2 == FloatType 
                 then
@@ -484,7 +485,7 @@ compileExpr a (Add expr1 expr2)
                             putCode $ "    int_to_real r" ++ show (a+1) ++ ", r" ++ show (a+1) ++ "\n"
                             return FloatType
                     else
-                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2
+                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2 ++ "\n"
 
 compileExpr a (Minus expr1 expr2) = return FloatType
 compileExpr a (Mul expr1 expr2) = return FloatType
