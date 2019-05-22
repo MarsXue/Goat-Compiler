@@ -103,7 +103,13 @@ resetProcedure
         resetSlot
         resetVariables
 
-
+getVariable :: String -> State SymTable (Bool, BaseType, VarShape, Int)
+getVariable ident
+    = do
+        st <- get
+        case Map.lookup ident (variables st) of
+            Nothing -> error $ "undefined variable " ++ ident
+            Just v -> return v
 
 -----------Main Compiler-----------
 
@@ -195,6 +201,61 @@ compileStmts (s:stmts)
         compileStmts stmts
 
 compileStmt :: Stmt -> State SymTable ()
+
+-- Assign statement
+compileStmt (Assign stmtVar expr)
+    = do
+        compileExpr 0 expr
+        (_, type, _, slot) <- getVariable stmtVar
+        -- store 0, r0
+        putCode ("    store " ++ lslot ++ ", r0\n")
+
+-- Read statement
+compileStmt(Read (StmtVar ident))
+    = do
+        putCode ("    call_builtin ")
+        (_, type, _, slot) <- getVariable (show ident)
+        case ltype of
+            BoolType
+                -> do
+                    putCode ("read_bool\n")
+            IntType
+                -> do
+                    putCode ("read_int\n")
+            FloatType
+                -> do
+                    putCode ("read_real\n")
+
+-- Write statement
+compileStmt (Write expr)
+    = do
+        baseType <- compileExpr 0 expr
+        case baseType of
+            BoolType
+                -> do
+                    let function = "print_bool"
+            IntType
+                -> do
+                    let function = "print_int"
+            FloatType
+                -> do
+                    let function = "print_real"
+        (_, type, _, slot) <- getVariable (show expr)
+        putCode ("    load r0, " ++ slot ++ "\n")
+        putCode ("    call_builtin " ++ function ++ "\n")
+
+-- Write string statement
+compileStmt (SWrite string)
+    = do
+        putCode ("  # write string")
+        putCode ("    string_const r0, " ++ string ++ "\n")
+        putCode ("    call_builtin print_string" ++ "\n")
+
+-- Call statement
+compileStmt (Call ident (e:es))
+    = do
+        return ()
+
 -- if then statement
 compileStmt (If expr stmts [])
     = do
@@ -238,9 +299,6 @@ compileStmt (While expr stmts)
         else
             error $ "Expression of While statement can not have type " ++ show(exprType)
 
-compileStmt (Call ident exprs)
-    = do
-        return ()
 
 ----------- Declartion Helper -----------
 
@@ -298,6 +356,18 @@ whichDeclReg ri rf (Decl baseType _)
 
 ----------- Expression Helper -----------
 compileExpr :: Int -> Expr -> State SymTable BaseType
+compileExpr reg (BoolConst bool)
+    = do
+        compileConstExpr reg "int_const" bool
+        return BoolType
+compileExpr reg (IntConst int)
+    = do
+        compileConstExpr reg "int_const" int
+        return IntType
+compileExpr reg (FloatConst float)
+    = do
+        compileConstExpr reg "real_const" float
+        return FloatType
 compileExpr a (Add expr1 expr2)
     = do
         let type1 = compileExpr a expr1
@@ -334,8 +404,17 @@ compileExpr a (Less expr1 expr2) = BoolType
 compileExpr a (LessEqual expr1 expr2) = BoolType
 compileExpr a (Greater expr1 expr2) = BoolType
 compileExpr a (GreaterEqual expr1 expr2) = BoolType
-compileExpr a (Neg expr) == BoolType
-compileExpr a (UMinus expr) == FloatType
+compileExpr a (Neg expr) = BoolType
+compileExpr a (UMinus expr) = FloatType
+
+
+-- Constant expression
+compileConstExpr :: Int -> String -> Expr -> State SymTable ()
+compileConstExpr reg s bool
+    = do
+        -- load r0, 0
+        putCode ("    load " ++ s ++ "r" ++ reg ++ ", " ++ "\n" )
+
 
 ----------- Parameters Helper -----------
 

@@ -34,7 +34,7 @@ begin
         y := remainder;
         quotient := x / y;
         remainder := x - quotient * y;
-    do
+    od
 
     write y;
     write "\n";
