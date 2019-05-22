@@ -180,8 +180,14 @@ putComments cmt
 
 ----------- Statement Helper -----------
 
+putStmtLabel :: Int -> State SymTable ()
+putStmtLabel a
+    = do
+        putCode ("label_" ++ show a ++ ":\n")
+
 putStatements :: [Stmt] -> State SymTable ()
-putStatements s:ss
+putStatements [] = return ()
+putStatements (s:ss)
     = do
         putStatement s
         putStatements ss
@@ -201,20 +207,19 @@ compileStmts (s:stmts)
         compileStmts stmts
 
 compileStmt :: Stmt -> State SymTable ()
-
--- Assign statement
-compileStmt (Assign stmtVar expr)
-    = do
-        compileExpr 0 expr
-        (_, type, _, slot) <- getVariable stmtVar
-        -- store 0, r0
-        putCode ("    store " ++ lslot ++ ", r0\n")
+-- -- Assign statement
+-- compileStmt (Assign stmtVar expr)
+--     = do
+--         compileExpr 0 expr
+--         (_, _, _, slot) <- getVariable stmtVar
+--         -- store 0, r0
+--         putCode ("    store " ++ show slot ++ ", r0\n")
 
 -- Read statement
-compileStmt(Read (StmtVar ident))
+compileStmt (Read (SBaseVar ident))
     = do
         putCode ("    call_builtin ")
-        (_, type, _, slot) <- getVariable (show ident)
+        (_, ltype, _, slot) <- getVariable (show ident)
         case ltype of
             BoolType
                 -> do
@@ -230,19 +235,13 @@ compileStmt(Read (StmtVar ident))
 compileStmt (Write expr)
     = do
         baseType <- compileExpr 0 expr
-        case baseType of
-            BoolType
-                -> do
-                    let function = "print_bool"
-            IntType
-                -> do
-                    let function = "print_int"
-            FloatType
-                -> do
-                    let function = "print_real"
-        (_, type, _, slot) <- getVariable (show expr)
-        putCode ("    load r0, " ++ slot ++ "\n")
-        putCode ("    call_builtin " ++ function ++ "\n")
+        let func = case baseType of
+                        BoolType -> "print_bool"
+                        IntType -> "print_int"
+                        FloatType -> "print_real"
+        (_, ltype, _, lslot) <- getVariable (show expr)
+        putCode ("    load r0, " ++ show lslot ++ "\n")
+        putCode ("    call_builtin " ++ func ++ "\n")
 
 -- Write string statement
 compileStmt (SWrite string)
@@ -260,11 +259,13 @@ compileStmt (Call ident (e:es))
 compileStmt (If expr stmts [])
     = do
         afterThen <- nextAvailableLabel
-        let exprType = compileExpr 0 expr
-        if exprType == BoolType then
-            putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
-            compileStmts stmts
-            putStmtLabel afterThen
+        exprType <- compileExpr 0 expr
+        if exprType == BoolType 
+            then
+                do
+                    putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
+                    compileStmts stmts
+                    putStmtLabel afterThen
         else
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
@@ -273,14 +274,16 @@ compileStmt (If expr thenStmts elseStmts)
     = do
         inElse <- nextAvailableLabel
         afterElse <- nextAvailableLabel
-        let exprType = compileExpr 0 expr
-        if exprType == BoolType then
-            putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
-            compileStmts thenStmts
-            putCode ("    branch_uncond r0, label_" ++ show(afterElse) ++ "\n")
-            putStmtLabel inElse
-            compileStmts elseStmts
-            putStmtLabel afterElse
+        exprType <- compileExpr 0 expr
+        if exprType == BoolType 
+            then
+                do
+                    putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
+                    compileStmts thenStmts
+                    putCode ("    branch_uncond r0, label_" ++ show(afterElse) ++ "\n")
+                    putStmtLabel inElse
+                    compileStmts elseStmts
+                    putStmtLabel afterElse
         else
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
@@ -290,14 +293,18 @@ compileStmt (While expr stmts)
         inWhile <- nextAvailableLabel
         afterWhile <- nextAvailableLabel
         putStmtLabel inWhile
-        let exprType = compileExpr 0 expr
-        if exprType == BoolType then
-            putCode ("    branch_on_false r0, label_" ++ show(afterWhile) ++ "\n")
-            compileStmts stmts
-            putCode ("    branch_uncond label_" ++ show(inWhile) ++ "\n")
-            putStmtLabel afterWhile
+        exprType <- compileExpr 0 expr
+        if exprType == BoolType 
+            then
+                do
+                    putCode ("    branch_on_false r0, label_" ++ show afterWhile ++ "\n")
+                    compileStmts stmts
+                    putCode ("    branch_uncond label_" ++ show inWhile ++ "\n")
+                    putStmtLabel afterWhile
         else
             error $ "Expression of While statement can not have type " ++ show(exprType)
+
+compileStmt _ = return ()
 
 
 ----------- Declartion Helper -----------
@@ -356,64 +363,69 @@ whichDeclReg ri rf (Decl baseType _)
 
 ----------- Expression Helper -----------
 compileExpr :: Int -> Expr -> State SymTable BaseType
-compileExpr reg (BoolConst bool)
+compileExpr reg (BoolConst b)
     = do
-        compileConstExpr reg "int_const" bool
+        let boolint = if b then 1 else 0
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint)
         return BoolType
-compileExpr reg (IntConst int)
+
+compileExpr reg (IntConst i)
     = do
-        compileConstExpr reg "int_const" int
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show i)
         return IntType
-compileExpr reg (FloatConst float)
+
+compileExpr reg (FloatConst f)
     = do
-        compileConstExpr reg "real_const" float
+        putCode ("    real_const r" ++ show reg ++ ", " ++ show f)
         return FloatType
+
 compileExpr a (Add expr1 expr2)
     = do
-        let type1 = compileExpr a expr1
-        let type2 = compileExpr (a+1) expr2
+        type1 <- compileExpr a expr1
+        type2 <- compileExpr (a+1) expr2
         if type1 == type2 then
-            if type1 == IntType then
-                putCode ("    add_int r" ++ show(a) ++ ", r" ++ show(a) ++ ", r" ++ show(a+1) ++ "\n")
-                return IntType
+            if type1 == IntType 
+                then
+                    do
+                        putCode ("    add_int r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
+                        return IntType
             else
-                if type1 == FloatType then
-                    putCode ("    add_real r" ++ show(a) ++ ", r" ++ show(a) ++ ", r" ++ show(a+1) ++ "\n")
-                    return FloatType
+                if type1 == FloatType 
+                    then
+                        do
+                            putCode ("    add_real r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
+                            return FloatType
                 else
-                    error $ "Can not add type " ++ show(type1) ++ " with type " ++ show(type2)
+                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2
         else
-            if type1 == IntType and type2 == FloatType then
-                putCode ("    int_to_real r" ++ show(a) ++ ", r" ++ show(a) ++ "\n")
-                return FloatType
+            if type1 == IntType && type2 == FloatType 
+                then
+                    do
+                        putCode ("    int_to_real r" ++ show a ++ ", r" ++ show a ++ "\n")
+                        return FloatType
             else
-                if type1 == FloatType and type2 == IntType then
-                    putCode ("    int_to_real r" ++ show(a+1) ++ ", r" ++ show(a+1) ++ "\n")
-                    return FloatType
-                else
-                    error $ "Can not minus " ++ show(type1) ++ " with " ++ show(type2)
+                if type1 == FloatType && type2 == IntType 
+                    then
+                        do
+                            putCode $ "    int_to_real r" ++ show (a+1) ++ ", r" ++ show (a+1) ++ "\n"
+                            return FloatType
+                    else
+                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2
 
-compileExpr a (Minus expr1 expr2) = FloatType
-compileExpr a (Mul expr1 expr2) = FloatType
-compileExpr a (Div expr1 expr2) = FloatType
-compileExpr a (Or expr1 expr2) = BoolType
-compileExpr a (And expr1 expr2) = BoolType
-compileExpr a (Equal expr1 expr2) = BoolType
-compileExpr a (NotEqual expr1 expr2) = BoolType
-compileExpr a (Less expr1 expr2) = BoolType
-compileExpr a (LessEqual expr1 expr2) = BoolType
-compileExpr a (Greater expr1 expr2) = BoolType
-compileExpr a (GreaterEqual expr1 expr2) = BoolType
-compileExpr a (Neg expr) = BoolType
-compileExpr a (UMinus expr) = FloatType
+compileExpr a (Minus expr1 expr2) = return FloatType
+compileExpr a (Mul expr1 expr2) = return FloatType
+compileExpr a (Div expr1 expr2) = return FloatType
+compileExpr a (Or expr1 expr2) = return BoolType
+compileExpr a (And expr1 expr2) = return BoolType
+compileExpr a (Equal expr1 expr2) = return BoolType
+compileExpr a (NotEqual expr1 expr2) = return BoolType
+compileExpr a (Less expr1 expr2) = return BoolType
+compileExpr a (LessEqual expr1 expr2) = return BoolType
+compileExpr a (Greater expr1 expr2) = return BoolType
+compileExpr a (GreaterEqual expr1 expr2) = return BoolType
+compileExpr a (Neg expr) = return BoolType
+compileExpr a (UMinus expr) = return FloatType
 
-
--- Constant expression
-compileConstExpr :: Int -> String -> Expr -> State SymTable ()
-compileConstExpr reg s bool
-    = do
-        -- load r0, 0
-        putCode ("    load " ++ s ++ "r" ++ reg ++ ", " ++ "\n" )
 
 
 ----------- Parameters Helper -----------
