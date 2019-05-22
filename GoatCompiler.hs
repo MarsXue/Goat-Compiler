@@ -251,9 +251,10 @@ compileStmt (SWrite string)
         putCode ("    call_builtin print_string" ++ "\n")
 
 -- Call statement
-compileStmt (Call ident (e:es))
+compileStmt (Call ident es)
     = do
-        return ()
+        compileExprs ident 0 es
+        putCode ("    call proc_" ++ ident ++ "\n")
 
 -- if then statement
 compileStmt (If expr stmts [])
@@ -305,6 +306,27 @@ compileStmt (While expr stmts)
             error $ "Expression of While statement can not have type " ++ show(exprType)
 
 compileStmt _ = return ()
+
+compileExprs :: String -> Int -> [Expr] -> State SymTable ()
+compileExprs _ _ [] = return ()
+compileExprs ident n (e:es)
+    = do
+        exprType <- compileExpr n e
+        paramType <- getParameter ident n
+        -- type checking (actual && formal)
+        if exprType == paramType
+            then
+                compileExprs ident (n+1) es
+            else
+                error $ show (n+1) ++ " th parameter type is not matched"
+
+
+-- Get the parameter by procedure and index
+getParameter :: String -> Int -> State SymTable (BaseType)
+getParameter ident idx
+    = do
+        st <- get
+        return $ (procedures st) ! ident !! idx
 
 
 ----------- Declartion Helper -----------
