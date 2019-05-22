@@ -467,7 +467,8 @@ compileExpr reg (Id (IndexVar ident (IArray expr1 expr2)))
                                   putCode $ "    mul_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+1) ++ "\n"
                                   putCode $ "    add_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+2) ++ "\n"
                                   putCode $ "    load_address r" ++ show reg ++ ", " ++ show slotnum ++ "\n"
-                                  putCode $ "    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ show (reg+3) ++ "\n"
+                                  putCode $ "    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" show (reg+3) ++ "\n"
+                                  putCode $ "    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n"
                                   return baseType
                       else
                           error $ "Array Index must be IntType, while type " ++ show type1 ++ " and type " ++ show type2 " received"
