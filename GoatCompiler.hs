@@ -241,15 +241,38 @@ putAssignCode (IndexVar ident (IArray expr)) reg
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
-            then 
-                do
-                    addrReg <- nextAvailableReg
-                    putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show slot ++ "\n"
-                    putCode $ "    sub_offset" ++ 
-
+            then putAssignCodeOffset offsetReg slot reg
             else error $ "array index is not Int"
 
+putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg
+    = do
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        offsetReg <- nextAvailableReg
+        colReg <- nextAvailableReg
+        expr1Type <- compileExpr offsetReg expr1
+        expr2Type <- compileExpr colReg expr2
+        if expr1Type == IntType && expr2Type == IntType
+            then 
+                do
+                    putSetOffsetReg offsetReg colReg col
+                    putAssignCodeOffset offsetReg slot reg
+            else error $ "array index is not Int"
 
+putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
+putSetOffsetReg offsetReg colReg col
+    = do
+        sizeReg <- nextAvailableReg
+        putCode $ "int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
+        putCode $ "mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ sizeReg ++ "\n"
+        putCode $ "add_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
+
+putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
+putAssignCodeOffset offsetReg startSlot reg
+    = do
+        addrReg <- nextAvailableReg
+        putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show startSlot ++ "\n"
+        putCode $ "    sub_offset r" ++ show addrReg ++ ", r" ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
+        putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 putAssignCodeRef :: Int -> Int -> State SymTable ()
 putAssignCodeRef addrSlot reg
@@ -259,40 +282,12 @@ putAssignCodeRef addrSlot reg
         putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 compileStmt :: Stmt -> State SymTable ()
--- Assign statement
-compileStmt (Assign stmtVar expr)
-    = do
-        regThis <- nextAvailableReg
-        compileExpr regThis expr
-        
-        case stmtVar of
-            (SBaseVar ident) 
-                -> do
-                    (isVal, baseType, varShape, slot) <- getVariable ident
-                    if isVal 
-                        then putCode $ "    store " ++ show slot ++ ", r" ++ show regThis ++ "\n"
-                        else 
-                            do
-                                regAddr <- nextAvailableReg
-                                putCode $ "    load r" ++ show regAddr ++ ", " ++ show slot ++ "\n"
-                                putCode $ "    store_indirect r" ++ show regAddr ++ ", r" ++ show regThis ++ "\n"
-
-            (IndexVar ident index) 
-                -> do
-                    (isVal, baseType, varShape, slot) <- getVariable ident
-                    case index of 
-                        (IArray expr)
-                            -> do
-                                regAry <- nextAvailableReg
-                                compileExpr regAry expr
-
-        -- store 0, r0
 compileStmt (Assign stmtVar expr)
     = do
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
         if assginableType (getStmtVarBaseType stmtVar) exprType 
-            then 
+            then putAssignCode stmtVar regThis
             else error $ "assginment type dose not match" 
 ---------------------------------------------------------------------------------------------------------------------
 
