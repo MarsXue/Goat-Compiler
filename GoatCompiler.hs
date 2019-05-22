@@ -111,6 +111,20 @@ getVariable ident
             Nothing -> error $ "undefined variable " ++ ident
             Just v -> return v
 
+getProcdure :: String -> State SymTable ([(Bool, BaseType)])
+getProcdure ident
+    = do
+        st <- get
+        case Map.lookup ident (procedures st) of
+            Nothing -> error $ "undefined procedure " ++ ident
+            Just v -> return v
+
+getProcParameter :: String -> Int -> State SymTable (Bool, BaseType)
+getProcParameter ident idx
+    = do
+        st <- get
+        return $ (procedures st) ! ident !! idx
+
 -----------Main Compiler-----------
 
 compileProg :: GoatProg -> State SymTable ()
@@ -330,8 +344,13 @@ compileStmt (SWrite string)
 -- Call statement
 compileStmt (Call ident es)
     = do
-        compileExprs ident 0 es
-        putCode ("    call proc_" ++ ident ++ "\n")
+        proc <- getProcdure ident
+        if (length proc) == (length es)
+            then 
+                do
+                    compileExprs ident 0 es
+                    putCode ("    call proc_" ++ ident ++ "\n")
+            else error $ "procedure call arity dose not matched \n"
 
 -- if then statement
 compileStmt (If expr stmts [])
@@ -388,28 +407,61 @@ compileExprs :: String -> Int -> [Expr] -> State SymTable ()
 compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
     = do
-        exprType <- compileExpr n e
-        (isVar, paramType) <- getParameter ident n
-        -- Type checking (actual && formal)
-        if exprType == paramType
+        (isVar, baseType) <- getProcParameter ident n
+        if isVar 
             then
-                case isVar of
-                    -- Call by value
-                    True
-                        -> compileExprs ident (n+1) es
-                    -- Call be reference
-                    False
-                        -> return ()
+                do
+                    exprType <- compileExpr n e
+                    if exprType == baseType 
+                        then return ()
+                        else error $ " procedure parameter dose not match "
+
             else
-                error $ show (n+1) ++ " th parameter type is not matched"
+                case e of
+                    (Id stmtVar) -> do
+                        stmtVarType <- getStmtVarBaseType stmtVar
+                        if stmtVarType == baseType
+                            then storeAddressToRegN stmtVar n 
+                            else error $ " procedure parameter dose not match "
+                    _ -> error $ " Ref procedure parameter dose not allow Non-lvalue "
 
-
--- Get the parameter by procedure and index
-getParameter :: String -> Int -> State SymTable (Bool, BaseType)
-getParameter ident idx
+storeAddressToRegN :: StmtVar -> Int -> State SymTable ()
+storeAddressToRegN (SBaseVar ident) destReg
     = do
-        st <- get
-        return $ (procedures st) ! ident !! idx
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        if not isVal
+            then putCode $ "    load r" ++ show destReg ++ ", " ++ show slot ++ "\n"
+            else putCode $ "    load_address r" ++ show destReg ++ ", " ++ show slot ++ "\n"
+
+storeAddressToRegN (IndexVar ident (IArray expr)) destReg
+    = do
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        offsetReg <- nextAvailableReg
+        exprType <- compileExpr offsetReg expr
+        if exprType == IntType 
+            then putStoreAddressCodeOffset offsetReg slot destReg
+            else error $ " array index is not Int " ++ ident
+
+storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg
+    = do
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        offsetReg <- nextAvailableReg
+        colReg <- nextAvailableReg
+        expr1Type <- compileExpr offsetReg expr1
+        expr2Type <- compileExpr colReg expr2
+        if expr1Type == IntType && expr2Type == IntType
+            then 
+                do
+                    putSetOffsetReg offsetReg colReg col
+                    putStoreAddressCodeOffset offsetReg slot destReg
+            else error $ " matrix index is not Int " ++ ident
+
+
+putStoreAddressCodeOffset :: Int -> Int -> Int -> State SymTable ()
+putStoreAddressCodeOffset offsetReg startSlot destReg
+    = do
+        putCode $ "    load_address r" ++ show destReg ++ ", " ++ show startSlot ++ "\n"
+        putCode $ "    sub_offset r" ++ show destReg ++ ", r" ++ show destReg ++ ", r" ++ show offsetReg ++ "\n"
 
 
 ----------- Declartion Helper -----------
@@ -421,7 +473,7 @@ putDeclarations ds
         ri <- nextAvailableReg
         putCode $ "    int_const r" ++ show ri ++ ", 0\n"
         rf <- nextAvailableReg
-        putCode $ "    real_const r" ++ show rf ++ ", 0\n"
+        putCode $ "    real_const r" ++ show rf ++ ", 0.0\n"
         putDeclarations' ri rf ds
 
 
