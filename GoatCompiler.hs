@@ -20,7 +20,7 @@ data SymTable = SymTable
     , regCounter   :: Int
     , code         :: String
     , variables    :: Map String (Bool, BaseType, VarShape, Int)
-    , procedures   :: Map String ([BaseType])
+    , procedures   :: Map String ([(Bool, BaseType)])
     } deriving (Show)
 
 -----------SymTable Helper-----------
@@ -153,13 +153,13 @@ compileProcedure (Proc ident params decls stmts)
 
 
         -- put statements
-        -- putComments "Compile Statements"
-        -- putStatements stmts
-        -- resetReg
+        putComments "Compile Statements"
+        putStatements stmts
+        resetReg
 
         -- put epilogue
         putProcedureEpilogue stackSize
-        resetProcedure
+        -- resetProcedure
         return ()
 
 
@@ -179,6 +179,9 @@ putComments cmt
         putCode $ "  # " ++ cmt ++ "\n"
 
 ----------- Statement Helper -----------
+
+
+
 
 putStmtLabel :: Int -> State SymTable ()
 putStmtLabel a
@@ -205,21 +208,99 @@ compileStmts (s:stmts)
     = do
         compileStmt s
         compileStmts stmts
+---------------------------------------------------------------------------------------------------------------------
+
+getStmtVarBaseType :: StmtVar -> State SymTable BaseType
+getStmtVarBaseType (SBaseVar ident)
+    = do
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        return baseType
+getStmtVarBaseType (IndexVar ident index)
+    = do
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        return baseType
+
+assginableType :: BaseType -> BaseType -> Bool
+assginableType st ex = 
+    if st == ex then True
+        else
+            if st == FloatType && ex == IntType then True
+                else False
+
+putAssignCode :: StmtVar -> Int -> State SymTable ()
+putAssignCode (SBaseVar ident) reg
+    = do
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        if not isVal 
+            then putAssignCodeRef slot reg
+            else putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
+
+putAssignCode (IndexVar ident (IArray expr)) reg
+    = do 
+        (isVal, baseType, varShape, slot) <- getVariable ident
+        offsetReg <- nextAvailableReg
+        exprType <- compileExpr offsetReg expr
+        if exprType == IntType 
+            then 
+                do
+                    addrReg <- nextAvailableReg
+                    putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show slot ++ "\n"
+                    putCode $ "    sub_offset" ++ 
+
+            else error $ "array index is not Int"
+
+
+
+putAssignCodeRef :: Int -> Int -> State SymTable ()
+putAssignCodeRef addrSlot reg
+    = do
+        addrReg <- nextAvailableReg
+        putCode $ "    load r" ++ show addrReg ++ ", " ++ show addrSlot ++ "\n"
+        putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 compileStmt :: Stmt -> State SymTable ()
--- -- Assign statement
--- compileStmt (Assign stmtVar expr)
---     = do
---         compileExpr 0 expr
---         (_, _, _, slot) <- getVariable stmtVar
---         -- store 0, r0
---         putCode ("    store " ++ show slot ++ ", r0\n")
+-- Assign statement
+compileStmt (Assign stmtVar expr)
+    = do
+        regThis <- nextAvailableReg
+        compileExpr regThis expr
+        
+        case stmtVar of
+            (SBaseVar ident) 
+                -> do
+                    (isVal, baseType, varShape, slot) <- getVariable ident
+                    if isVal 
+                        then putCode $ "    store " ++ show slot ++ ", r" ++ show regThis ++ "\n"
+                        else 
+                            do
+                                regAddr <- nextAvailableReg
+                                putCode $ "    load r" ++ show regAddr ++ ", " ++ show slot ++ "\n"
+                                putCode $ "    store_indirect r" ++ show regAddr ++ ", r" ++ show regThis ++ "\n"
+
+            (IndexVar ident index) 
+                -> do
+                    (isVal, baseType, varShape, slot) <- getVariable ident
+                    case index of 
+                        (IArray expr)
+                            -> do
+                                regAry <- nextAvailableReg
+                                compileExpr regAry expr
+
+        -- store 0, r0
+compileStmt (Assign stmtVar expr)
+    = do
+        regThis <- nextAvailableReg
+        exprType <- compileExpr regThis expr
+        if assginableType (getStmtVarBaseType stmtVar) exprType 
+            then 
+            else error $ "assginment type dose not match" 
+---------------------------------------------------------------------------------------------------------------------
 
 -- Read statement
 compileStmt (Read (SBaseVar ident))
     = do
         putCode ("    call_builtin ")
-        (_, ltype, _, slot) <- getVariable (show ident)
+        (_, ltype, _, slot) <- getVariable ident
         case ltype of
             BoolType
                 -> do
@@ -239,8 +320,6 @@ compileStmt (Write expr)
                         BoolType -> "print_bool"
                         IntType -> "print_int"
                         FloatType -> "print_real"
-        (_, ltype, _, lslot) <- getVariable (show expr)
-        putCode ("    load r0, " ++ show lslot ++ "\n")
         putCode ("    call_builtin " ++ func ++ "\n")
 
 -- Write string statement
@@ -501,7 +580,7 @@ putProcedures (p:ps)
 putProcedure :: Proc -> State SymTable ()
 putProcedure (Proc ident params _ _)
     = do
-        let types = map (\(Param _ bt _) -> bt) params
+        let types = map (\(Param i bt _) -> ((i == Val), bt)) params
         insertProcedure ident types
 
 
