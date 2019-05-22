@@ -153,9 +153,9 @@ compileProcedure (Proc ident params decls stmts)
 
 
         -- put statements
-        -- putComments "Compile Statements"
-        -- putStatements stmts
-        -- resetReg
+        putComments "Compile Statements"
+        putStatements stmts
+        resetReg
 
         -- put epilogue
         putProcedureEpilogue stackSize
@@ -218,8 +218,9 @@ compileStmt :: Stmt -> State SymTable ()
 -- Read statement
 compileStmt (Read (SBaseVar ident))
     = do
+        reg <- nextAvailableReg
         putCode ("    call_builtin ")
-        (_, ltype, _, slot) <- getVariable (show ident)
+        (_, ltype, _, slot) <- getVariable ident
         case ltype of
             BoolType
                 -> do
@@ -230,6 +231,7 @@ compileStmt (Read (SBaseVar ident))
             FloatType
                 -> do
                     putCode ("read_real\n")
+        putCode ("    store " ++ show slot ++ ", r" ++ show reg ++ "\n")
 
 -- Write statement
 compileStmt (Write expr)
@@ -239,15 +241,13 @@ compileStmt (Write expr)
                         BoolType -> "print_bool"
                         IntType -> "print_int"
                         FloatType -> "print_real"
-        (_, ltype, _, lslot) <- getVariable (show expr)
-        putCode ("    load r0, " ++ show lslot ++ "\n")
         putCode ("    call_builtin " ++ func ++ "\n")
 
 -- Write string statement
 compileStmt (SWrite string)
     = do
-        putCode ("  # write string")
-        putCode ("    string_const r0, " ++ string ++ "\n")
+        reg <- nextAvailableReg
+        putCode ("    string_const r" ++ show reg ++ ", \"" ++ string ++ "\"" ++ "\n")
         putCode ("    call_builtin print_string" ++ "\n")
 
 -- Call statement

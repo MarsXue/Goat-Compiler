@@ -30,7 +30,7 @@ main
             let output = ast input
             case output of
               Right tree -> do
-                              -- putStr $ show (test tree)
+                              putStrLn $ show (test tree)
                               -- putStr "\n\n\n\n\n\n"
                               putStr $ getCode (test tree)
               Left   err -> do
