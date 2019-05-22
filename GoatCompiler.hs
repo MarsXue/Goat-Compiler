@@ -8,10 +8,10 @@ import Data.Map (
 import qualified Data.Map as Map
 import GoatAST
 
-data VarShape 
-    = Single 
-    | Array Int 
-    | Matrix Int Int 
+data VarShape
+    = Single
+    | Array Int
+    | Matrix Int Int
     deriving (Show, Eq)
 
 data SymTable = SymTable
@@ -72,12 +72,12 @@ insertProcedure ident types
 
 insertVariable :: String -> (Bool, BaseType, VarShape, Int) -> State SymTable ()
 insertVariable ident (isVal, bt, vs, slot)
-    = do 
+    = do
         st <- get
         if Map.member ident (variables st)
             then error $ "duplicate variable name " ++ ident
             else put $ st {variables = Map.insert ident (isVal, bt, vs, slot) (variables st)}
-        
+
 resetSlot :: State SymTable ()
 resetSlot
     = do
@@ -124,7 +124,7 @@ compileProcedures (p:ps)
     = do
         compileProcedure p
         compileProcedures ps
-        
+
 
 
 compileProcedure :: Proc -> State SymTable ()
@@ -155,7 +155,7 @@ compileProcedure (Proc ident params decls stmts)
         putProcedureEpilogue stackSize
         resetProcedure
         return ()
-        
+
 
 
 ----------------------Helper----------------------
@@ -177,8 +177,8 @@ putComments cmt
 putStatements :: [Stmt] -> State SymTable ()
 putStatements s:ss
     = do
-        putStatement s 
-        putStatements ss 
+        putStatement s
+        putStatements ss
 
 putStatement :: Stmt -> State SymTable ()
 putStatement s
@@ -187,11 +187,66 @@ putStatement s
         compileStmt s
         resetReg
 
+compileStmts :: [Stmt] -> State SymTable ()
+compileStmts [] = return ()
+compileStmts (s:stmts)
+    = do
+        compileStmt s
+        compileStmts stmts
+
+compileStmt :: Stmt -> State SymTable ()
+-- if then statement
+compileStmt (If expr stmts [])
+    = do
+        afterThen <- nextAvailableLabel
+        let exprType = compileExpr 0 expr
+        if exprType == BoolType then
+            putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
+            compileStmts stmts
+            putStmtLabel afterThen
+        else
+            error $ "Expression of If statement can not have type " ++ show(exprType)
+
+-- if then else statement
+compileStmt (If expr thenStmts elseStmts)
+    = do
+        inElse <- nextAvailableLabel
+        afterElse <- nextAvailableLabel
+        let exprType = compileExpr 0 expr
+        if exprType == BoolType then
+            putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
+            compileStmts thenStmts
+            putCode ("    branch_uncond r0, label_" ++ show(afterElse) ++ "\n")
+            putStmtLabel inElse
+            compileStmts elseStmts
+            putStmtLabel afterElse
+        else
+            error $ "Expression of If statement can not have type " ++ show(exprType)
+
+-- while statement
+compileStmt (While expr stmts)
+    = do
+        inWhile <- nextAvailableLabel
+        afterWhile <- nextAvailableLabel
+        putStmtLabel inWhile
+        let exprType = compileExpr 0 expr
+        if exprType == BoolType then
+            putCode ("    branch_on_false r0, label_" ++ show(afterWhile) ++ "\n")
+            compileStmts stmts
+            putCode ("    branch_uncond label_" ++ show(inWhile) ++ "\n")
+            putStmtLabel afterWhile
+        else
+            error $ "Expression of While statement can not have type " ++ show(exprType)
+
+compileStmt (Call ident exprs)
+    = do
+        return ()
+
 ----------- Declartion Helper -----------
 
 putDeclarations :: [Decl] -> State SymTable ()
 putDeclarations [] = return ()
-putDeclarations ds 
+putDeclarations ds
     = do
         ri <- nextAvailableReg
         putCode $ "    int_const r" ++ show ri ++ ", 0\n"
@@ -202,7 +257,7 @@ putDeclarations ds
 
 putDeclarations' :: Int -> Int -> [Decl] -> State SymTable ()
 putDeclarations' _ _ [] = return ()
-putDeclarations' ri rf (d:ds) 
+putDeclarations' ri rf (d:ds)
     = do
         let r = whichDeclReg ri rf d
         putDeclaration' r d
@@ -220,7 +275,7 @@ putDeclaration' r (Decl baseType declVar)
 
             (ShapeVar ident shape)
                 -> case shape of
-                    (SArray num) 
+                    (SArray num)
                         -> do
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Array num), slot)
@@ -241,26 +296,66 @@ whichDeclReg ri rf (Decl baseType _)
         then rf
         else ri
 
-        
+----------- Expression Helper -----------
+compileExpr :: Int -> Expr -> State SymTable BaseType
+compileExpr a (Add expr1 expr2)
+    = do
+        let type1 = compileExpr a expr1
+        let type2 = compileExpr (a+1) expr2
+        if type1 == type2 then
+            if type1 == IntType then
+                putCode ("    add_int r" ++ show(a) ++ ", r" ++ show(a) ++ ", r" ++ show(a+1) ++ "\n")
+                return IntType
+            else
+                if type1 == FloatType then
+                    putCode ("    add_real r" ++ show(a) ++ ", r" ++ show(a) ++ ", r" ++ show(a+1) ++ "\n")
+                    return FloatType
+                else
+                    error $ "Can not add type " ++ show(type1) ++ " with type " ++ show(type2)
+        else
+            if type1 == IntType and type2 == FloatType then
+                putCode ("    int_to_real r" ++ show(a) ++ ", r" ++ show(a) ++ "\n")
+                return FloatType
+            else
+                if type1 == FloatType and type2 == IntType then
+                    putCode ("    int_to_real r" ++ show(a+1) ++ ", r" ++ show(a+1) ++ "\n")
+                    return FloatType
+                else
+                    error $ "Can not minus " ++ show(type1) ++ " with " ++ show(type2)
+
+compileExpr a (Minus expr1 expr2) = FloatType
+compileExpr a (Mul expr1 expr2) = FloatType
+compileExpr a (Div expr1 expr2) = FloatType
+compileExpr a (Or expr1 expr2) = BoolType
+compileExpr a (And expr1 expr2) = BoolType
+compileExpr a (Equal expr1 expr2) = BoolType
+compileExpr a (NotEqual expr1 expr2) = BoolType
+compileExpr a (Less expr1 expr2) = BoolType
+compileExpr a (LessEqual expr1 expr2) = BoolType
+compileExpr a (Greater expr1 expr2) = BoolType
+compileExpr a (GreaterEqual expr1 expr2) = BoolType
+compileExpr a (Neg expr) == BoolType
+compileExpr a (UMinus expr) == FloatType
+
 ----------- Parameters Helper -----------
 
 putParameters :: [Param] -> State SymTable ()
 putParameters [] = return ()
-putParameters (p:ps) 
-    = do 
+putParameters (p:ps)
+    = do
         putParameter p
         putParameters ps
-        
+
 
 putParameter :: Param -> State SymTable ()
 putParameter (Param indicator baseType ident)
-    = do 
+    = do
         slot <- nextAvailableSlot
         reg <- nextAvailableReg
         insertVariable ident ((indicator == Val), baseType, Single, slot)
         putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "         # " ++ show indicator ++ " " ++ ident ++ "\n"
 
-                
+
 ------------------ Procedure Helper ----------------------
 
 
@@ -270,7 +365,7 @@ putProcedureLabel ident
         putCode $ "proc_" ++ ident ++ ":\n"
 
 putProcedurePrologue :: [Param] -> [Decl] -> State SymTable Int
-putProcedurePrologue params decls 
+putProcedurePrologue params decls
     = do
         putComments "Prologue"
         let ps = length params
@@ -291,8 +386,8 @@ getDeclsSize [] = 0
 getDeclsSize (d:ds) = (getDeclSize d) + (getDeclsSize ds)
 
 getDeclSize :: Decl -> Int
-getDeclSize (Decl _ declVar) = 
-    case declVar of 
+getDeclSize (Decl _ declVar) =
+    case declVar of
         (DBaseVar _)
             -> 1
         (ShapeVar _ shape)
@@ -317,7 +412,7 @@ putProcedure (Proc ident params _ _)
     = do
         let types = map (\(Param _ bt _) -> bt) params
         insertProcedure ident types
-        
+
 
 
 checkMain :: State SymTable ()
