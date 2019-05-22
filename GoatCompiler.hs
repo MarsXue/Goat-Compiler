@@ -241,14 +241,38 @@ putAssignCode (IndexVar ident (IArray expr)) reg
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
-            then 
-                do
-                    addrReg <- nextAvailableReg
-                    putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show slot ++ "\n"
-                    putCode $ "    sub_offset" ++ 
+            then putAssignCodeOffset offsetReg slot reg
             else error $ "array index is not Int"
 
+putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg
+    = do
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        offsetReg <- nextAvailableReg
+        colReg <- nextAvailableReg
+        expr1Type <- compileExpr offsetReg expr1
+        expr2Type <- compileExpr colReg expr2
+        if expr1Type == IntType && expr2Type == IntType
+            then 
+                do
+                    putSetOffsetReg offsetReg colReg col
+                    putAssignCodeOffset offsetReg slot reg
+            else error $ "array index is not Int"
 
+putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
+putSetOffsetReg offsetReg colReg col
+    = do
+        sizeReg <- nextAvailableReg
+        putCode $ "int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
+        putCode $ "mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
+        putCode $ "add_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
+
+putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
+putAssignCodeOffset offsetReg startSlot reg
+    = do
+        addrReg <- nextAvailableReg
+        putCode $ "    load_address r" ++ show addrReg ++ ", " ++ show startSlot ++ "\n"
+        putCode $ "    sub_offset r" ++ show addrReg ++ ", r" ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
+        putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 putAssignCodeRef :: Int -> Int -> State SymTable ()
 putAssignCodeRef addrSlot reg
@@ -258,40 +282,13 @@ putAssignCodeRef addrSlot reg
         putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 compileStmt :: Stmt -> State SymTable ()
--- Assign statement
-compileStmt (Assign stmtVar expr)
-    = do
-        regThis <- nextAvailableReg
-        compileExpr regThis expr
-        
-        case stmtVar of
-            (SBaseVar ident) 
-                -> do
-                    (isVal, baseType, varShape, slot) <- getVariable ident
-                    if isVal 
-                        then putCode $ "    store " ++ show slot ++ ", r" ++ show regThis ++ "\n"
-                        else 
-                            do
-                                regAddr <- nextAvailableReg
-                                putCode $ "    load r" ++ show regAddr ++ ", " ++ show slot ++ "\n"
-                                putCode $ "    store_indirect r" ++ show regAddr ++ ", r" ++ show regThis ++ "\n"
-
-            (IndexVar ident index) 
-                -> do
-                    (isVal, baseType, varShape, slot) <- getVariable ident
-                    case index of 
-                        (IArray expr)
-                            -> do
-                                regAry <- nextAvailableReg
-                                compileExpr regAry expr
-
-        -- store 0, r0
 compileStmt (Assign stmtVar expr)
     = do
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
-        if assginableType (getStmtVarBaseType stmtVar) exprType 
-            then 
+        stmtType <- getStmtVarBaseType stmtVar
+        if assginableType stmtType exprType 
+            then putAssignCode stmtVar regThis
             else error $ "assginment type dose not match" 
 ---------------------------------------------------------------------------------------------------------------------
 
@@ -474,17 +471,17 @@ compileExpr :: Int -> Expr -> State SymTable BaseType
 compileExpr reg (BoolConst b)
     = do
         let boolint = if b then 1 else 0
-        putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint)
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint ++ "\n")
         return BoolType
 
 compileExpr reg (IntConst i)
     = do
-        putCode ("    int_const r" ++ show reg ++ ", " ++ show i)
+        putCode ("    int_const r" ++ show reg ++ ", " ++ show i ++ "\n")
         return IntType
 
 compileExpr reg (FloatConst f)
     = do
-        putCode ("    real_const r" ++ show reg ++ ", " ++ show f)
+        putCode ("    real_const r" ++ show reg ++ ", " ++ show f ++ "\n")
         return FloatType
 
 compileExpr a (Add expr1 expr2)
@@ -504,7 +501,7 @@ compileExpr a (Add expr1 expr2)
                             putCode ("    add_real r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
                             return FloatType
                 else
-                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2
+                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2 ++ "\n"
         else
             if type1 == IntType && type2 == FloatType 
                 then
@@ -518,7 +515,7 @@ compileExpr a (Add expr1 expr2)
                             putCode $ "    int_to_real r" ++ show (a+1) ++ ", r" ++ show (a+1) ++ "\n"
                             return FloatType
                     else
-                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2
+                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2 ++ "\n"
 
 compileExpr a (Minus expr1 expr2) = return FloatType
 compileExpr a (Mul expr1 expr2) = return FloatType
