@@ -147,7 +147,9 @@ compileProcedure (Proc ident params decls stmts)
 
 
         -- put statements
-
+        putComments "Compile Statements"
+        putStatements stmts
+        resetReg
 
         -- put epilogue
         putProcedureEpilogue stackSize
@@ -169,6 +171,22 @@ putComments :: String -> State SymTable ()
 putComments cmt
     = do
         putCode $ "  # " ++ cmt ++ "\n"
+
+----------- Statement Helper -----------
+
+putStatements :: [Stmt] -> State SymTable ()
+putStatements s:ss
+    = do
+        putStatement s 
+        putStatements ss 
+
+putStatement :: Stmt -> State SymTable ()
+putStatement s
+    = do
+        putComments $ show s
+        compileStmt s
+        resetReg
+
 ----------- Declartion Helper -----------
 
 putDeclarations :: [Decl] -> State SymTable ()
