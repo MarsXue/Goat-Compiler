@@ -262,9 +262,9 @@ putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
 putSetOffsetReg offsetReg colReg col
     = do
         sizeReg <- nextAvailableReg
-        putCode $ "int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
-        putCode $ "mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
-        putCode $ "add_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
+        putCode $ "    int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
+        putCode $ "    mul_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
+        putCode $ "    add_int r" ++ show offsetReg ++ ", r" ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
 
 putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
 putAssignCodeOffset offsetReg startSlot reg

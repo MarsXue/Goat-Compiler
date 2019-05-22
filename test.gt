@@ -1,5 +1,5 @@
 proc main()
-    int x[5];
+    int x[1, 5];
 begin
-    x[2] := 5;
+    x[1, 2] := 5;
 end
