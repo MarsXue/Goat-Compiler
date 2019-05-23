@@ -104,13 +104,22 @@ resetProcedure
         resetSlot
         resetVariables
 
-getVariable :: String -> State SymTable (Bool, BaseType, VarShape, Int)
-getVariable ident
+getVariable :: String -> VarShape -> State SymTable (Bool, BaseType, VarShape, Int)
+getVariable ident vs
     = do
         st <- get
         case Map.lookup ident (variables st) of
             Nothing -> error $ "undefined variable " ++ ident
-            Just v -> return v
+            Just (isVal, baseType, varShape, slot) 
+                -> if sameVarShapeType vs varShape 
+                    then return (isVal, baseType, varShape, slot)
+                    else error $ "type of variable is not matching " ++ ident
+
+sameVarShapeType :: VarShape -> VarShape -> Bool
+sameVarShapeType Single Single = True
+sameVarShapeType (Array _) (Array _) = True
+sameVarShapeType (Matrix _ _) (Matrix _ _) = True
+sameVarShapeType _ _ = False
 
 getProcdure :: String -> State SymTable ([(Bool, BaseType)])
 getProcdure ident
@@ -174,7 +183,7 @@ compileProcedure (Proc _ ident params decls stmts)
 
         -- put epilogue
         putProcedureEpilogue stackSize
-        -- resetProcedure
+        resetProcedure
         return ()
 
 
@@ -239,31 +248,32 @@ compileStmts (s:stmts)
 getStmtVarBaseType :: StmtVar -> State SymTable BaseType
 getStmtVarBaseType (SBaseVar ident)
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         return baseType
 getStmtVarBaseType (IndexVar ident index)
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (convertIndex2VarShape index)
         return baseType
 
-assginableType :: BaseType -> BaseType -> Bool
-assginableType st ex = 
-    if st == ex then True
-        else
-            if st == FloatType && ex == IntType then True
-                else False
+convertIndex2VarShape :: Index -> VarShape
+convertIndex2VarShape (IArray _) = (Array 0)
+convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0) 
+
+assignableType :: BaseType -> BaseType -> Bool
+assignableType FloatType IntType = True
+assignableType st ex = st == ex
 
 putAssignCode :: StmtVar -> Int -> State SymTable ()
 putAssignCode (SBaseVar ident) reg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         if not isVal 
             then putAssignCodeRef slot reg
             else putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
 
 putAssignCode (IndexVar ident (IArray expr)) reg
     = do 
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Array 0)
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
@@ -272,7 +282,7 @@ putAssignCode (IndexVar ident (IArray expr)) reg
 
 putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg
     = do
-        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident (Matrix 0 0)
         offsetReg <- nextAvailableReg
         colReg <- nextAvailableReg
         expr1Type <- compileExpr offsetReg expr1
@@ -307,24 +317,12 @@ putAssignCodeRef addrSlot reg
         putCode $ "    load r" ++ show addrReg ++ ", " ++ show addrSlot ++ "\n"
         putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
-compileStmt :: Stmt -> State SymTable ()
-compileStmt (Assign _ stmtVar expr)
-    = do
-        regThis <- nextAvailableReg
-        exprType <- compileExpr regThis expr
-        stmtType <- getStmtVarBaseType stmtVar
-        if assginableType stmtType exprType 
-            then putAssignCode stmtVar regThis
-            else error $ "assginment type dose not match" 
----------------------------------------------------------------------------------------------------------------------
 
--- Read statement
-compileStmt (Read _ (SBaseVar ident))
+putReadCodeType :: BaseType -> State SymTable ()
+putReadCodeType baseType
     = do
-        reg <- nextAvailableReg
         putCode ("    call_builtin ")
-        (_, ltype, _, slot) <- getVariable ident
-        case ltype of
+        case baseType of
             BoolType
                 -> do
                     putCode ("read_bool\n")
@@ -334,7 +332,26 @@ compileStmt (Read _ (SBaseVar ident))
             FloatType
                 -> do
                     putCode ("read_real\n")
-        putCode ("    store " ++ show slot ++ ", r" ++ show reg ++ "\n")
+
+---------------------------------------------------------------------------------------------------------------------
+compileStmt :: Stmt -> State SymTable ()
+-- Assign statement
+compileStmt (Assign _ stmtVar expr)
+    = do
+        regThis <- nextAvailableReg
+        exprType <- compileExpr regThis expr
+        stmtType <- getStmtVarBaseType stmtVar
+        if assignableType stmtType exprType 
+            then putAssignCode stmtVar regThis
+            else error $ "assginment type dose not match" 
+
+-- Read statement
+compileStmt (Read _ stmtVar)
+    = do
+        reg <- nextAvailableReg
+        baseType <- getStmtVarBaseType stmtVar
+        putReadCodeType baseType
+        putAssignCode stmtVar reg
 
 -- Write statement
 compileStmt (Write _ expr)
@@ -413,14 +430,12 @@ compileStmt (While _ expr stmts)
         else
             error $ "Expression of While statement can not have type " ++ show(exprType)
 
-compileStmt _ = return ()
-
 compileExprs :: String -> Int -> [Expr] -> State SymTable ()
 compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
     = do
-        (isVar, baseType) <- getProcParameter ident n
-        if isVar 
+        (isVal, baseType) <- getProcParameter ident n
+        if isVal 
             then
                 do
                     exprType <- compileExpr n e
@@ -440,14 +455,14 @@ compileExprs ident n (e:es)
 storeAddressToRegN :: StmtVar -> Int -> State SymTable ()
 storeAddressToRegN (SBaseVar ident) destReg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         if not isVal
             then putCode $ "    load r" ++ show destReg ++ ", " ++ show slot ++ "\n"
             else putCode $ "    load_address r" ++ show destReg ++ ", " ++ show slot ++ "\n"
 
 storeAddressToRegN (IndexVar ident (IArray expr)) destReg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Array 0)
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
@@ -456,7 +471,7 @@ storeAddressToRegN (IndexVar ident (IArray expr)) destReg
 
 storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg
     = do
-        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident (Matrix 0 0)
         offsetReg <- nextAvailableReg
         colReg <- nextAvailableReg
         expr1Type <- compileExpr offsetReg expr1
@@ -531,6 +546,7 @@ whichDeclReg ri rf (Decl _ baseType _)
         else ri
 
 ----------- Expression Helper -----------
+
 compileExpr :: Int -> Expr -> State SymTable BaseType
 compileExpr reg (BoolConst _ b)
     = do
@@ -548,54 +564,203 @@ compileExpr reg (FloatConst _ f)
         putCode ("    real_const r" ++ show reg ++ ", " ++ show f ++ "\n")
         return FloatType
 
-compileExpr a (Add _ expr1 expr2)
+
+compileExpr reg (Add _ expr1 expr2)          = compileArithmetricExpr "add" reg expr1 expr2
+compileExpr reg (Minus _ expr1 expr2)        = compileArithmetricExpr "sub" reg expr1 expr2
+compileExpr reg (Mul _ expr1 expr2)          = compileArithmetricExpr "mul" reg expr1 expr2
+compileExpr reg (Div _ expr1 expr2)          = compileArithmetricExpr "div" reg expr1 expr2
+compileExpr reg (Equal _ expr1 expr2)        = compileEqualityExpr "eq" reg expr1 expr2
+compileExpr reg (NotEqual _ expr1 expr2)     = compileEqualityExpr "ne" reg expr1 expr2
+compileExpr reg (Or _ expr1 expr2)           = compileLogicalExpr "or" reg expr1 expr2
+compileExpr reg (And _ expr1 expr2)          = compileLogicalExpr "and" reg expr1 expr2
+compileExpr reg (Less _ expr1 expr2)         = compileCompareExpr "lt" reg expr1 expr2
+compileExpr reg (LessEqual _ expr1 expr2)    = compileCompareExpr "le" reg expr1 expr2
+compileExpr reg (Greater _ expr1 expr2)      = compileCompareExpr "gt" reg expr1 expr2
+compileExpr reg (GreaterEqual _ expr1 expr2) = compileCompareExpr "ge" reg expr1 expr2
+
+compileExpr reg (Neg _ expr)
     = do
-        type1 <- compileExpr a expr1
-        type2 <- compileExpr (a+1) expr2
-        if type1 == type2 then
-            if type1 == IntType 
+        type1 <- compileExpr reg expr
+        if type1 == BoolType
+            then
+                do
+                    putCode ("    not r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                    return BoolType
+        else
+            error $ "Can not negate type " ++ show type1
+
+compileExpr reg (UMinus _ expr)
+    = do
+        type1 <- compileExpr reg expr
+        if type1 == IntType || type1 == FloatType
+            then
+                do
+                    putCode ("    not r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                    return type1
+        else
+            error $ "Can not negate type " ++ show type1
+
+compileExpr reg (Id _ (SBaseVar ident))
+    = do
+        (isVal, baseType, varShape, slotnum) <- getVariable ident (Single)
+        if varShape == Single then
+            if isVal
                 then
                     do
-                        putCode ("    add_int r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
+                        putCode ("    load r" ++ show reg ++ ", " ++ show slotnum ++ "\n")
+                        return baseType
+            else
+                do
+                    putCode ("    load r" ++ show reg ++ ", " ++ show slotnum ++ "\n")
+                    putCode ("    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                    return baseType
+        else
+            error $ "Expected type " ++ show varShape ++ ", while type Single received"
+
+compileExpr reg (Id _ (IndexVar ident (IArray expr)))
+    = do
+        (_, baseType, varShape, slotnum) <- getVariable ident (Array 0)
+        exprType <- compileExpr (reg+1) expr
+        case varShape of
+            (Array n)
+                -> do
+                      if exprType == IntType
+                          then
+                              do
+                                  putCode ("    load_address r" ++ show reg ++ ", " ++ show slotnum ++ "\n")
+                                  putCode ("    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                                  putCode ("    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                                  return baseType
+                      else
+                          error $ "Array Index must be IntType, while type " ++ show exprType ++ " received"
+            Single
+                -> error $ "Expect Single expression, while Array expression is given"
+            (Matrix _ _)
+                -> error $ "Expect Matrix expression, while Array expression is given"
+
+compileExpr reg (Id _ (IndexVar ident (IMatrix expr1 expr2)))
+    = do
+        (_, baseType, varShape, slotnum) <- getVariable ident (Matrix 0 0)
+        type1 <- compileExpr (reg+1) expr1
+        type2 <- compileExpr (reg+2) expr2
+        case varShape of
+            (Matrix a b)
+                -> do
+                      if type1 == IntType && type2 == IntType
+                          then
+                              do
+                                  putCode $ "    int_const r" ++ show (reg+3) ++ ", " ++ show b ++ "\n"
+                                  putCode $ "    mul_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+1) ++ "\n"
+                                  putCode $ "    add_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+2) ++ "\n"
+                                  putCode $ "    load_address r" ++ show reg ++ ", " ++ show slotnum ++ "\n"
+                                  putCode $ "    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+3) ++ "\n"
+                                  putCode $ "    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n"
+                                  return baseType
+                      else
+                          error $ "Array Index must be IntType, while type " ++ show type1 ++ " and type " ++ show type2 ++ " received"
+            (Single)
+                -> error $ "Expect Single expression, while Matrix expression is given"
+            (Array _)
+                -> error $ "Expect Array expression, while Matrix expression is given"
+
+compileArithmetricExpr :: String -> Int -> Expr -> Expr -> State SymTable BaseType
+compileArithmetricExpr s reg expr1 expr2
+    = do
+        type1 <- compileExpr reg expr1
+        type2 <- compileExpr (reg+1) expr2
+        if type1 == type2 then
+            if type1 == IntType
+                then
+                    do
+                        putCode ("    " ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
                         return IntType
             else
-                if type1 == FloatType 
+                if type1 == FloatType
                     then
                         do
-                            putCode ("    add_real r" ++ show a ++ ", r" ++ show a ++ ", r" ++ show (a+1) ++ "\n")
+                            putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
                             return FloatType
                 else
-                    error $ "Can not add type " ++ show type1 ++ " with type " ++ show type2 ++ "\n"
+                    error $ "Can not " ++ s ++ " type " ++ show type1 ++ " with type " ++ show type2
         else
-            if type1 == IntType && type2 == FloatType 
+            if type1 == IntType && type2 == FloatType
                 then
                     do
-                        putCode ("    int_to_real r" ++ show a ++ ", r" ++ show a ++ "\n")
+                        putCode ("    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                        putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
                         return FloatType
             else
-                if type1 == FloatType && type2 == IntType 
+                if type1 == FloatType && type2 == IntType
                     then
                         do
-                            putCode $ "    int_to_real r" ++ show (a+1) ++ ", r" ++ show (a+1) ++ "\n"
+                            putCode ("    int_to_real r" ++ show (reg+1) ++ ", r" ++ show (reg+1) ++ "\n")
+                            putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
                             return FloatType
                     else
-                        error $ "Can not minus " ++ show type1 ++ " with " ++ show type2 ++ "\n"
+                        error $ "Can not " ++ s ++ " type " ++ show type1 ++ " with type " ++ show type2
 
-compileExpr a (Minus _ expr1 expr2) = return FloatType
-compileExpr a (Mul _ expr1 expr2) = return FloatType
-compileExpr a (Div _ expr1 expr2) = return FloatType
-compileExpr a (Or _ expr1 expr2) = return BoolType
-compileExpr a (And _ expr1 expr2) = return BoolType
-compileExpr a (Equal _ expr1 expr2) = return BoolType
-compileExpr a (NotEqual _ expr1 expr2) = return BoolType
-compileExpr a (Less _ expr1 expr2) = return BoolType
-compileExpr a (LessEqual _ expr1 expr2) = return BoolType
-compileExpr a (Greater _ expr1 expr2) = return BoolType
-compileExpr a (GreaterEqual _ expr1 expr2) = return BoolType
-compileExpr a (Neg _ expr) = return BoolType
-compileExpr a (UMinus _ expr) = return FloatType
-compileExpr a (Id _ b) = return IntType
+compileEqualityExpr :: String -> Int -> Expr -> Expr -> State SymTable BaseType
+compileEqualityExpr s reg expr1 expr2
+    = do
+        type1 <- compileExpr reg expr1
+        type2 <- compileExpr (reg+1) expr2
+        if type1 == type2 then
+            if type1 == FloatType
+                then
+                    do
+                        putCode ("    cmp_" ++ s ++ "_real" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                        return BoolType
+            else
+                do
+                    putCode ("    cmp_" ++ s ++ "_int" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                    return BoolType
+        else
+            error $ "Can not compare " ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
 
+compileLogicalExpr :: String -> Int -> Expr -> Expr -> State SymTable BaseType
+compileLogicalExpr s reg expr1 expr2
+    = do
+        type1 <- compileExpr reg expr1
+        type2 <- compileExpr (reg+1) expr2
+        if type1 == BoolType && type2 == BoolType
+            then
+                do
+                    putCode ("    " ++ s ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                    return BoolType
+        else
+            error $ s ++ " operation can not be used between type " ++ show type1 ++ " and " ++ show type2
+
+compileCompareExpr :: String -> Int -> Expr -> Expr -> State SymTable BaseType
+compileCompareExpr s reg expr1 expr2
+    = do
+        type1 <- compileExpr reg expr1
+        type2 <- compileExpr (reg+1) expr2
+        if type1 == type2 then
+            if type1 == FloatType
+                then
+                    do
+                        putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                        return BoolType
+            else
+                do
+                    putCode ("    cmp_" ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                    return BoolType
+        else
+            if type1 == IntType && type2 == FloatType
+                then
+                    do
+                        putCode ("    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                        putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                        return BoolType
+            else
+                if type1 == FloatType && type2 == IntType
+                    then
+                        do
+                            putCode ("    int_to_real r" ++ show (reg+1) ++ ", r" ++ show (reg+1) ++ "\n")
+                            putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                            return BoolType
+                    else
+                        error $ "Can not compare" ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
 
 ----------- Parameters Helper -----------
 
