@@ -1,0 +1,21 @@
+proc main()
+    int x;
+begin
+    read x;
+    call factorial(x);
+end
+
+proc factorial(val int n)
+    int f;
+begin
+    f := 1;
+
+    if n < 0 then
+        write "Less than zero!";
+    else
+        while n > 1 do
+            f := f * n;
+            n := n - 1;
+        od
+    fi
+end

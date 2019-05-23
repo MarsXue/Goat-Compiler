@@ -5,12 +5,17 @@
 
 module GoatAST where
 
+import Text.Parsec.Pos
+
 -----------------------------------
 -- Specification of an AST for Goat
 -----------------------------------
 
--- Identifier: string
+-- Identifier: String
 type Ident = String
+
+-- Position: SourcePos (SourceName, Line, Column)
+type Pos = SourcePos
 
 -- Parameter indicator: value, reference
 data Indicator
@@ -56,34 +61,34 @@ data StmtVar
 -- Expression
 data Expr
   -- Identifier
-  = Id StmtVar
+  = Id Pos StmtVar
   -- Constant expression
-  | BoolConst Bool
-  | IntConst Int
-  | FloatConst Float
+  | BoolConst Pos Bool
+  | IntConst Pos Int
+  | FloatConst Pos Float
   -- Binary operation expression
-  | Add Expr Expr
-  | Minus Expr Expr
-  | Mul Expr Expr
-  | Div Expr Expr
-  | Or Expr Expr
-  | And Expr Expr
-  | Equal Expr Expr
-  | NotEqual Expr Expr
-  | Less Expr Expr
-  | LessEqual Expr Expr
-  | Greater Expr Expr
-  | GreaterEqual Expr Expr
+  | Add Pos Expr Expr
+  | Minus Pos Expr Expr
+  | Mul Pos Expr Expr
+  | Div Pos Expr Expr
+  | Or Pos Expr Expr
+  | And Pos Expr Expr
+  | Equal Pos Expr Expr
+  | NotEqual Pos Expr Expr
+  | Less Pos Expr Expr
+  | LessEqual Pos Expr Expr
+  | Greater Pos Expr Expr
+  | GreaterEqual Pos Expr Expr
   -- Unary operation expression
-  | Neg Expr
-  | UMinus Expr
+  | Neg Pos Expr
+  | UMinus Pos Expr
   deriving (Show, Eq)
 
 -- Declaration
 data Decl
   -- BaseType: base type
   -- DeclVar:  declaration variable
-  = Decl BaseType DeclVar
+  = Decl Pos BaseType DeclVar
   deriving (Show, Eq)
 
 -- Statement
@@ -92,13 +97,13 @@ data Stmt
   -- Expr:    expression
   -- Ident:   identifier
   -- Stmt:    statement
-  = Assign StmtVar Expr   -- <stmtvar> := <expr>;
-  | Read StmtVar          -- read <stmtvar>;
-  | Write Expr            -- write <expr>;
-  | SWrite String         -- write <string>;
-  | Call Ident [Expr]     -- call <id> (<expr-list>);
-  | If Expr [Stmt] [Stmt] -- if <expr> then <stmt-list> else <stmt-list> fi
-  | While Expr [Stmt]     -- while <expr> do <stmt-list> od
+  = Assign Pos StmtVar Expr   -- <stmtvar> := <expr>;
+  | Read Pos StmtVar          -- read <stmtvar>;
+  | Write Pos Expr            -- write <expr>;
+  | SWrite Pos String         -- write <string>;
+  | Call Pos Ident [Expr]     -- call <id> (<expr-list>);
+  | If Pos Expr [Stmt] [Stmt] -- if <expr> then <stmt-list> else <stmt-list> fi
+  | While Pos Expr [Stmt]     -- while <expr> do <stmt-list> od
   deriving (Show, Eq)
 
 -- Parameter
@@ -106,7 +111,7 @@ data Param
   -- Indicator: indicator
   -- BaseType:  base type
   -- Ident:     identifier
-  = Param Indicator BaseType Ident
+  = Param Pos Indicator BaseType Ident
   deriving (Show, Eq)
 
 -- Procedure
@@ -115,7 +120,7 @@ data Proc
   -- [Param]: list of parameters
   -- [Decl]:  list of declarations
   -- [Stmt]:  list of statements
-  = Proc Ident [Param] [Decl] [Stmt]
+  = Proc Pos Ident [Param] [Decl] [Stmt]
   deriving (Show, Eq)
 
 -- Goar Program
