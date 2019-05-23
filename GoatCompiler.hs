@@ -103,13 +103,22 @@ resetProcedure
         resetSlot
         resetVariables
 
-getVariable :: String -> State SymTable (Bool, BaseType, VarShape, Int)
-getVariable ident
+getVariable :: String -> VarShape -> State SymTable (Bool, BaseType, VarShape, Int)
+getVariable ident vs
     = do
         st <- get
         case Map.lookup ident (variables st) of
             Nothing -> error $ "undefined variable " ++ ident
-            Just v -> return v
+            Just (isVal, baseType, varShape, slot) 
+                -> if sameVarShapeType vs varShape 
+                    then return (isVal, baseType, varShape, slot)
+                    else error $ "type of variable is not matching " ++ ident
+
+sameVarShapeType :: VarShape -> VarShape -> Bool
+sameVarShapeType Single Single = True
+sameVarShapeType (Array _) (Array _) = True
+sameVarShapeType (Matrix _ _) (Matrix _ _) = True
+sameVarShapeType _ _ = False
 
 getProcdure :: String -> State SymTable ([(Bool, BaseType)])
 getProcdure ident
@@ -227,12 +236,16 @@ compileStmts (s:stmts)
 getStmtVarBaseType :: StmtVar -> State SymTable BaseType
 getStmtVarBaseType (SBaseVar ident)
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         return baseType
 getStmtVarBaseType (IndexVar ident index)
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (convertIndex2VarShape index)
         return baseType
+
+convertIndex2VarShape :: Index -> VarShape
+convertIndex2VarShape (IArray _) = (Array 0)
+convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0) 
 
 assignableType :: BaseType -> BaseType -> Bool
 assignableType FloatType IntType = True
@@ -241,14 +254,14 @@ assignableType st ex = st == ex
 putAssignCode :: StmtVar -> Int -> State SymTable ()
 putAssignCode (SBaseVar ident) reg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         if not isVal 
             then putAssignCodeRef slot reg
             else putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
 
 putAssignCode (IndexVar ident (IArray expr)) reg
     = do 
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Array 0)
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
@@ -257,7 +270,7 @@ putAssignCode (IndexVar ident (IArray expr)) reg
 
 putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg
     = do
-        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident (Matrix 0 0)
         offsetReg <- nextAvailableReg
         colReg <- nextAvailableReg
         expr1Type <- compileExpr offsetReg expr1
@@ -292,24 +305,12 @@ putAssignCodeRef addrSlot reg
         putCode $ "    load r" ++ show addrReg ++ ", " ++ show addrSlot ++ "\n"
         putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
-compileStmt :: Stmt -> State SymTable ()
-compileStmt (Assign stmtVar expr)
-    = do
-        regThis <- nextAvailableReg
-        exprType <- compileExpr regThis expr
-        stmtType <- getStmtVarBaseType stmtVar
-        if assignableType stmtType exprType 
-            then putAssignCode stmtVar regThis
-            else error $ "assginment type dose not match" 
----------------------------------------------------------------------------------------------------------------------
 
--- Read statement
-compileStmt (Read (SBaseVar ident))
+putReadCodeType :: BaseType -> State SymTable ()
+putReadCodeType baseType
     = do
-        reg <- nextAvailableReg
         putCode ("    call_builtin ")
-        (_, ltype, _, slot) <- getVariable ident
-        case ltype of
+        case baseType of
             BoolType
                 -> do
                     putCode ("read_bool\n")
@@ -319,7 +320,28 @@ compileStmt (Read (SBaseVar ident))
             FloatType
                 -> do
                     putCode ("read_real\n")
-        putCode ("    store " ++ show slot ++ ", r" ++ show reg ++ "\n")
+
+compileStmt :: Stmt -> State SymTable ()
+-- Read statement
+compileStmt (Assign stmtVar expr)
+    = do
+        regThis <- nextAvailableReg
+        exprType <- compileExpr regThis expr
+        stmtType <- getStmtVarBaseType stmtVar
+        if assignableType stmtType exprType 
+            then putAssignCode stmtVar regThis
+            else error $ "assginment type dose not match" 
+
+---------------------------------------------------------------------------------------------------------------------
+
+-- Read statement
+compileStmt (Read stmtVar)
+    = do
+        reg <- nextAvailableReg
+        baseType <- getStmtVarBaseType stmtVar
+        putReadCodeType baseType
+        putAssignCode stmtVar reg
+        
 
 -- Write statement
 compileStmt (Write expr)
@@ -398,14 +420,12 @@ compileStmt (While expr stmts)
         else
             error $ "Expression of While statement can not have type " ++ show(exprType)
 
-compileStmt _ = return ()
-
 compileExprs :: String -> Int -> [Expr] -> State SymTable ()
 compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
     = do
-        (isVar, baseType) <- getProcParameter ident n
-        if isVar 
+        (isVal, baseType) <- getProcParameter ident n
+        if isVal 
             then
                 do
                     exprType <- compileExpr n e
@@ -425,14 +445,14 @@ compileExprs ident n (e:es)
 storeAddressToRegN :: StmtVar -> Int -> State SymTable ()
 storeAddressToRegN (SBaseVar ident) destReg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single)
         if not isVal
             then putCode $ "    load r" ++ show destReg ++ ", " ++ show slot ++ "\n"
             else putCode $ "    load_address r" ++ show destReg ++ ", " ++ show slot ++ "\n"
 
 storeAddressToRegN (IndexVar ident (IArray expr)) destReg
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident
+        (isVal, baseType, varShape, slot) <- getVariable ident (Array 0)
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
         if exprType == IntType 
@@ -441,7 +461,7 @@ storeAddressToRegN (IndexVar ident (IArray expr)) destReg
 
 storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg
     = do
-        (isVal, baseType, (Matrix row col), slot) <- getVariable ident
+        (isVal, baseType, (Matrix row col), slot) <- getVariable ident (Matrix 0 0)
         offsetReg <- nextAvailableReg
         colReg <- nextAvailableReg
         expr1Type <- compileExpr offsetReg expr1
