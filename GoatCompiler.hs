@@ -516,7 +516,7 @@ compileExprs ident n (e:es)
                       compileExprs ident (n+1) es
                   else
                     error $ putPosition pos ++ " procedure parameter dose not match "
-            _ -> error $ putPosition pos ++ " Ref procedure parameter dose not allow Non-lvalue "
+          _ -> error $ putPosition pos ++ " Ref procedure parameter dose not allow Non-lvalue "
 
 getExprPos :: Expr -> SourcePos
 getExprPos (Id pos _) = pos
