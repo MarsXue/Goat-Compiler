@@ -3,7 +3,7 @@
 -- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
 ---------------------------------------------------------
 
-module GoatParser (ast) where
+module GoatParser where
 
 import GoatFormat
 import GoatAST

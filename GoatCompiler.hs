@@ -1,4 +1,4 @@
-module GoatCompiler (test, getCode) where
+module GoatCompiler where
 
 import Control.Monad.State
 import Data.Map (
@@ -7,6 +7,7 @@ import Data.Map (
     )
 import qualified Data.Map as Map
 import GoatAST
+import GoatFormat (stmtToStr)
 import Text.Parsec.Pos
 
 data VarShape
@@ -103,8 +104,8 @@ getVariable ident vs pos
         st <- get
         case Map.lookup ident (variables st) of
             Nothing -> error $ putPosition pos ++ "undefined variable " ++ ident
-            Just (isVal, baseType, varShape, slot) 
-                -> if sameVarShapeType vs varShape 
+            Just (isVal, baseType, varShape, slot)
+                -> if sameVarShapeType vs varShape
                     then return (isVal, baseType, varShape, slot)
                     else error $ putPosition pos ++ "type of variable is not matching " ++ ident
 
@@ -160,19 +161,19 @@ compileProcedure (Proc _ ident params decls stmts)
         -- put prologue
         stackSize <- putProcedurePrologue params decls
         -- parameter passing
-        putComments "Passing parameters"
+        -- putComments "Passing parameters"
         putParameters params
         resetReg
 
 
         -- initialise decls
-        putComments "Initialise Declaration"
+        -- putComments "Initialise Declaration"
         putDeclarations decls
         resetReg
 
 
         -- put statements
-        putComments "Compile Statements"
+        -- putComments "Compile Statements"
         putStatements stmts
         resetReg
 
@@ -200,8 +201,8 @@ putComments cmt
 
 putPosition :: SourcePos -> String
 putPosition pos
-    = 
-        let 
+    =
+        let
             line = sourceLine pos
             column = sourceColumn pos
         in
@@ -209,9 +210,6 @@ putPosition pos
 
 
 ----------- Statement Helper -----------
-
-
-
 
 putStmtLabel :: Int -> State SymTable ()
 putStmtLabel a
@@ -228,9 +226,15 @@ putStatements (s:ss)
 putStatement :: Stmt -> State SymTable ()
 putStatement s
     = do
-        putComments $ show s
+        putStmtComment s
         compileStmt s
         resetReg
+
+
+putStmtComment :: Stmt -> State SymTable ()
+putStmtComment stmt
+    = do
+        putCode $ "  # " ++ (stmtToStr 0 stmt)
 
 compileStmts :: [Stmt] -> State SymTable ()
 compileStmts [] = return ()
@@ -241,9 +245,9 @@ compileStmts (s:stmts)
 ---------------------------------------------------------------------------------------------------------------------
 
 getStmtVarBaseType :: StmtVar -> SourcePos -> State SymTable BaseType
-getStmtVarBaseType (SBaseVar ident) pos 
+getStmtVarBaseType (SBaseVar ident) pos
     = do
-        (isVal, baseType, varShape, slot) <- getVariable ident (Single) pos 
+        (isVal, baseType, varShape, slot) <- getVariable ident (Single) pos
         return baseType
 getStmtVarBaseType (IndexVar ident index) pos
     = do
@@ -252,7 +256,7 @@ getStmtVarBaseType (IndexVar ident index) pos
 
 convertIndex2VarShape :: Index -> VarShape
 convertIndex2VarShape (IArray _) = (Array 0)
-convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0) 
+convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0)
 
 assignableType :: BaseType -> BaseType -> Bool
 assignableType FloatType IntType = True
@@ -262,16 +266,16 @@ putAssignCode :: StmtVar -> Int -> SourcePos -> State SymTable ()
 putAssignCode (SBaseVar ident) reg pos
     = do
         (isVal, baseType, varShape, slot) <- getVariable ident (Single) pos
-        if not isVal 
+        if not isVal
             then putAssignCodeRef slot reg
             else putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
 
 putAssignCode (IndexVar ident (IArray expr)) reg pos
-    = do 
+    = do
         (isVal, baseType, varShape, slot) <- getVariable ident (Array 0) pos
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
-        if exprType == IntType 
+        if exprType == IntType
             then putAssignCodeOffset offsetReg slot reg
             else error $ putPosition pos ++ "array index is not Int"
 
@@ -283,7 +287,7 @@ putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg pos
         expr1Type <- compileExpr offsetReg expr1
         expr2Type <- compileExpr colReg expr2
         if expr1Type == IntType && expr2Type == IntType
-            then 
+            then
                 do
                     putSetOffsetReg offsetReg colReg col
                     putAssignCodeOffset offsetReg slot reg
@@ -336,9 +340,9 @@ compileStmt (Assign pos stmtVar expr)
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
         stmtType <- getStmtVarBaseType stmtVar pos
-        if assignableType stmtType exprType 
+        if assignableType stmtType exprType
             then putAssignCode stmtVar regThis pos
-            else error $ putPosition pos ++ "assginment type dose not match" 
+            else error $ putPosition pos ++ "assginment type dose not match"
 
 -- Read statement
 compileStmt (Read pos stmtVar)
@@ -370,7 +374,7 @@ compileStmt (Call pos ident es)
     = do
         proc <- getProcdure ident pos
         if (length proc) == (length es)
-            then 
+            then
                 do
                     compileExprs ident 0 es
                     putCode ("    call proc_" ++ ident ++ "\n")
@@ -381,7 +385,7 @@ compileStmt (If pos expr stmts [])
     = do
         afterThen <- nextAvailableLabel
         exprType <- compileExpr 0 expr
-        if exprType == BoolType 
+        if exprType == BoolType
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
@@ -396,7 +400,7 @@ compileStmt (If pos expr thenStmts elseStmts)
         inElse <- nextAvailableLabel
         afterElse <- nextAvailableLabel
         exprType <- compileExpr 0 expr
-        if exprType == BoolType 
+        if exprType == BoolType
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
@@ -415,7 +419,7 @@ compileStmt (While pos expr stmts)
         afterWhile <- nextAvailableLabel
         putStmtLabel inWhile
         exprType <- compileExpr 0 expr
-        if exprType == BoolType 
+        if exprType == BoolType
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show afterWhile ++ "\n")
@@ -431,11 +435,11 @@ compileExprs ident n (e:es)
     = do
         let pos = getExprPos e
         (isVal, baseType) <- getProcParameter ident n
-        if isVal 
+        if isVal
             then
                 do
                     exprType <- compileExpr n e
-                    if exprType == baseType 
+                    if exprType == baseType
                         then compileExprs ident (n+1) es
                         else error $ putPosition pos ++ " procedure parameter dose not match "
 
@@ -444,7 +448,7 @@ compileExprs ident n (e:es)
                     (Id _ stmtVar) -> do
                         stmtVarType <- getStmtVarBaseType stmtVar pos
                         if stmtVarType == baseType
-                            then 
+                            then
                                 do
                                     storeAddressToRegN stmtVar n pos
                                     compileExprs ident (n+1) es
@@ -484,7 +488,7 @@ storeAddressToRegN (IndexVar ident (IArray expr)) destReg pos
         (isVal, baseType, varShape, slot) <- getVariable ident (Array 0) pos
         offsetReg <- nextAvailableReg
         exprType <- compileExpr offsetReg expr
-        if exprType == IntType 
+        if exprType == IntType
             then putStoreAddressCodeOffset offsetReg slot destReg
             else error $ putPosition pos ++ " array index is not Int " ++ ident
 
@@ -496,7 +500,7 @@ storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
         expr1Type <- compileExpr offsetReg expr1
         expr2Type <- compileExpr colReg expr2
         if expr1Type == IntType && expr2Type == IntType
-            then 
+            then
                 do
                     putSetOffsetReg offsetReg colReg col
                     putStoreAddressCodeOffset offsetReg slot destReg
@@ -537,35 +541,50 @@ putDeclaration' r (Decl pos baseType declVar)
         case declVar of
             (DBaseVar ident)
                 -> do
+                    putDeclComment (DBaseVar ident) baseType
                     slot <- nextAvailableSlot
                     insertVariable ident (True, baseType, Single, slot) pos
-                    putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "\n"
+                    putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
 
             (ShapeVar ident shape)
                 -> case shape of
                     (SArray num)
                         -> do
+                            putDeclComment (ShapeVar ident (SArray num)) baseType
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Array num), slot) pos
-                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "[" ++ show num ++ "]" ++ "\n"
+                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                             putFilledSkipSlot r (num - 1)
                     (SMatrix row col)
                         -> do
+                            putDeclComment (ShapeVar ident (shape)) baseType
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Matrix row col), slot) pos
-                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "[" ++ show row ++ "," ++ show col ++ "]" ++ "\n"
+                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                             putFilledSkipSlot r (row * col - 1)
 
 putFilledSkipSlot :: Int -> Int -> State SymTable ()
 putFilledSkipSlot _ 0 = return ()
-putFilledSkipSlot r num 
+putFilledSkipSlot r num
     = do
         slot <- nextAvailableSlot
         putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
         putFilledSkipSlot r (num - 1)
 
 
-
+putDeclComment :: DeclVar -> BaseType -> State SymTable ()
+putDeclComment declVar baseType
+    = do
+        let tStr = case baseType of
+                        IntType -> "int"
+                        BoolType -> "bool"
+                        FloatType -> "float"
+        let iStr = case declVar of
+                        (DBaseVar ident) -> ident
+                        (ShapeVar ident (SArray num)) -> ident ++ "[" ++ show num ++ "]"
+                        (ShapeVar ident (SMatrix row col)) -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
+        putCode $ "  # initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
+        return ()
 
 whichDeclReg :: Int -> Int -> Decl -> Int
 whichDeclReg ri rf (Decl _ baseType _)
@@ -594,8 +613,8 @@ compileExpr reg (FloatConst _ f)
 
 
 compileExpr reg (Add pos expr1 expr2)          = compileArithmetricExpr "add" reg expr1 expr2 pos
-compileExpr reg (Minus pos expr1 expr2)        = compileArithmetricExpr "sub" reg expr1 expr2 pos 
-compileExpr reg (Mul pos expr1 expr2)          = compileArithmetricExpr "mul" reg expr1 expr2 pos 
+compileExpr reg (Minus pos expr1 expr2)        = compileArithmetricExpr "sub" reg expr1 expr2 pos
+compileExpr reg (Mul pos expr1 expr2)          = compileArithmetricExpr "mul" reg expr1 expr2 pos
 compileExpr reg (Div pos expr1 expr2)          = compileArithmetricExpr "div" reg expr1 expr2 pos
 compileExpr reg (Equal pos expr1 expr2)        = compileEqualityExpr "eq" reg expr1 expr2 pos
 compileExpr reg (NotEqual pos expr1 expr2)     = compileEqualityExpr "ne" reg expr1 expr2 pos
@@ -820,7 +839,7 @@ putProcedureLabel ident
 putProcedurePrologue :: [Param] -> [Decl] -> State SymTable Int
 putProcedurePrologue params decls
     = do
-        putComments "Prologue"
+        putComments "prologue"
         let ps = length params
         let ds = getDeclsSize decls
         putCode $ "    push_stack_frame " ++ show (ps + ds) ++ "\n"
@@ -829,7 +848,7 @@ putProcedurePrologue params decls
 putProcedureEpilogue :: Int -> State SymTable ()
 putProcedureEpilogue n
     = do
-        putComments "Epilogue"
+        putComments "epilogue"
         putCode $ "    pop_stack_frame " ++ show n ++ "\n" ++ "    return\n"
         return ()
 
