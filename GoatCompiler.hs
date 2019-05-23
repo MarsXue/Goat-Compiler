@@ -139,6 +139,8 @@ getProcParameter ident idx
 compileProg :: GoatProg -> State SymTable ()
 compileProg (Prog ps)
     = do
+        putCode $ "    call proc_main\n    halt\n"
+
         putProcedures ps
         checkMain
 
@@ -430,7 +432,7 @@ compileExprs ident n (e:es)
                 do
                     exprType <- compileExpr n e
                     if exprType == baseType 
-                        then return ()
+                        then compileExprs ident (n+1) es
                         else error $ " procedure parameter dose not match "
 
             else
@@ -438,7 +440,10 @@ compileExprs ident n (e:es)
                     (Id stmtVar) -> do
                         stmtVarType <- getStmtVarBaseType stmtVar
                         if stmtVarType == baseType
-                            then storeAddressToRegN stmtVar n 
+                            then 
+                                do
+                                    storeAddressToRegN stmtVar n 
+                                    compileExprs ident (n+1) es
                             else error $ " procedure parameter dose not match "
                     _ -> error $ " Ref procedure parameter dose not allow Non-lvalue "
 

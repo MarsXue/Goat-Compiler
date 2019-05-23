@@ -1,6 +1,6 @@
 proc boo(ref int m, val int n)
 begin
-    write "test";
+    write "test\n";
     m := m + n;
 end
 
@@ -9,17 +9,19 @@ proc main()
     int y;
     int z;
 begin
+    
+    x := 1;
+    z := 2;
 
+    # Read test
     read y;
-
-    # Write test
-    # write x;
-
-    # SWrite test
+   
     write "SWrite Test\n";
 
     # Call test
     call boo(x, z);
+
+    write x;
 
     # Add test
     # z := x + y;
