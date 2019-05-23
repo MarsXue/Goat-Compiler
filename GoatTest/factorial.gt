@@ -3,9 +3,10 @@ proc main()
 begin
     read x;
     call factorial(x);
+    write x;
 end
 
-proc factorial(val int n)
+proc factorial(ref int n)
     int f;
 begin
     f := 1;
@@ -18,4 +19,5 @@ begin
             n := n - 1;
         od
     fi
+    write f;
 end

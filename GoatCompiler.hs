@@ -26,13 +26,6 @@ data SymTable = SymTable
 
 -----------SymTable Helper-----------
 
-skipSlot :: Int -> State SymTable ()
-skipSlot n
-    = do
-        st <- get
-        let slot = slotCounter st
-        put $ st {slotCounter = (slot + n)}
-
 
 nextAvailableSlot :: State SymTable Int
 nextAvailableSlot
@@ -536,14 +529,22 @@ putDeclaration' r (Decl _ baseType declVar)
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Array num), slot)
                             putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-                            skipSlot (num - 1)
+                            putFilledSkipSlot r (num - 1)
                     (SMatrix row col)
                         -> do
                             putDeclComment (ShapeVar ident (shape)) baseType
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Matrix row col), slot)
                             putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-                            skipSlot (row * col - 1)
+                            putFilledSkipSlot r (row * col - 1)
+
+putFilledSkipSlot :: Int -> Int -> State SymTable ()
+putFilledSkipSlot _ 0 = return ()
+putFilledSkipSlot r num 
+    = do
+        slot <- nextAvailableSlot
+        putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
+        putFilledSkipSlot r (num - 1)
 
 
 putDeclComment :: DeclVar -> BaseType -> State SymTable ()
