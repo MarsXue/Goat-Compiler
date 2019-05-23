@@ -523,26 +523,42 @@ putDeclaration' r (Decl _ baseType declVar)
         case declVar of
             (DBaseVar ident)
                 -> do
+                    putDeclComment (DBaseVar ident) baseType
                     slot <- nextAvailableSlot
                     insertVariable ident (True, baseType, Single, slot)
-                    putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "\n"
+                    putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
 
             (ShapeVar ident shape)
                 -> case shape of
                     (SArray num)
                         -> do
+                            putDeclComment (ShapeVar ident (SArray num)) baseType
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Array num), slot)
-                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "[" ++ show num ++ "]" ++ "\n"
+                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                             skipSlot (num - 1)
                     (SMatrix row col)
                         -> do
+                            putDeclComment (ShapeVar ident (shape)) baseType
                             slot <- nextAvailableSlot
                             insertVariable ident (True, baseType, (Matrix row col), slot)
-                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "         # " ++ ident ++ "[" ++ show row ++ "," ++ show col ++ "]" ++ "\n"
+                            putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                             skipSlot (row * col - 1)
 
 
+putDeclComment :: DeclVar -> BaseType -> State SymTable ()
+putDeclComment declVar baseType
+    = do
+        let tStr = case baseType of
+                        IntType -> "int"
+                        BoolType -> "bool"
+                        FloatType -> "float"
+        let iStr = case declVar of
+                        (DBaseVar ident) -> ident
+                        (ShapeVar ident (SArray num)) -> ident ++ "[" ++ show num ++ "]"
+                        (ShapeVar ident (SMatrix row col)) -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
+        putCode $ "  #  initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
+        return ()
 
 whichDeclReg :: Int -> Int -> Decl -> Int
 whichDeclReg ri rf (Decl _ baseType _)
@@ -797,7 +813,7 @@ putProcedureLabel ident
 putProcedurePrologue :: [Param] -> [Decl] -> State SymTable Int
 putProcedurePrologue params decls
     = do
-        putComments "Prologue"
+        putComments "prologue"
         let ps = length params
         let ds = getDeclsSize decls
         putCode $ "    push_stack_frame " ++ show (ps + ds) ++ "\n"
@@ -806,7 +822,7 @@ putProcedurePrologue params decls
 putProcedureEpilogue :: Int -> State SymTable ()
 putProcedureEpilogue n
     = do
-        putComments "Epilogue"
+        putComments "epilogue"
         putCode $ "    pop_stack_frame " ++ show n ++ "\n" ++ "    return\n"
         return ()
 
