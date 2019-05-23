@@ -86,6 +86,7 @@ data Expr
 
 -- Declaration
 data Decl
+  -- Pos: position
   -- BaseType: base type
   -- DeclVar:  declaration variable
   = Decl Pos BaseType DeclVar
@@ -93,6 +94,7 @@ data Decl
 
 -- Statement
 data Stmt
+  -- Pos: position
   -- StmtVar: statement variable
   -- Expr:    expression
   -- Ident:   identifier
@@ -108,6 +110,7 @@ data Stmt
 
 -- Parameter
 data Param
+  -- Pos: position
   -- Indicator: indicator
   -- BaseType:  base type
   -- Ident:     identifier
@@ -116,6 +119,7 @@ data Param
 
 -- Procedure
 data Proc
+  -- Pos: position
   -- Ident:   identifier
   -- [Param]: list of parameters
   -- [Decl]:  list of declarations

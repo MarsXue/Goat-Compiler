@@ -1,4 +1,4 @@
-Goat: Goat.hs GoatParser.hs GoatAST.hs GoatFormat.hs
+Goat: Goat.hs GoatAST.hs GoatParser.hs GoatFormat.hs GoatCompiler.hs
 	ghc -o Goat Goat.hs
 
 test:

@@ -1,4 +1,4 @@
-module GoatCompiler (test, getCode) where
+module GoatCompiler where
 
 import Control.Monad.State
 import Data.Map (
@@ -7,6 +7,7 @@ import Data.Map (
     )
 import qualified Data.Map as Map
 import GoatAST
+import GoatFormat (stmtToStr)
 import Text.Parsec.Pos
 
 data VarShape
@@ -160,19 +161,19 @@ compileProcedure (Proc _ ident params decls stmts)
         -- put prologue
         stackSize <- putProcedurePrologue params decls
         -- parameter passing
-        putComments "Passing parameters"
+        -- putComments "Passing parameters"
         putParameters params
         resetReg
 
 
         -- initialise decls
-        putComments "Initialise Declaration"
+        -- putComments "Initialise Declaration"
         putDeclarations decls
         resetReg
 
 
         -- put statements
-        putComments "Compile Statements"
+        -- putComments "Compile Statements"
         putStatements stmts
         resetReg
 
@@ -210,9 +211,6 @@ putPosition pos
 
 ----------- Statement Helper -----------
 
-
-
-
 putStmtLabel :: Int -> State SymTable ()
 putStmtLabel a
     = do
@@ -228,9 +226,15 @@ putStatements (s:ss)
 putStatement :: Stmt -> State SymTable ()
 putStatement s
     = do
-        putComments $ show s
+        putStmtComment s
         compileStmt s
         resetReg
+
+
+putStmtComment :: Stmt -> State SymTable ()
+putStmtComment stmt 
+    = do
+        putCode $ "  # " ++ (stmtToStr 0 stmt)
 
 compileStmts :: [Stmt] -> State SymTable ()
 compileStmts [] = return ()
@@ -558,7 +562,7 @@ putDeclComment declVar baseType
                         (DBaseVar ident) -> ident
                         (ShapeVar ident (SArray num)) -> ident ++ "[" ++ show num ++ "]"
                         (ShapeVar ident (SMatrix row col)) -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
-        putCode $ "  #  initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
+        putCode $ "  # initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
         return ()
 
 whichDeclReg :: Int -> Int -> Decl -> Int
