@@ -7,7 +7,7 @@ import Data.Map (
     )
 import qualified Data.Map as Map
 import GoatAST
-import GoatFormat (stmtToStr)
+import GoatFormat (stmtVarToStr, exprToStr, exprsToStr)
 import Text.Parsec.Pos
 
 data VarShape
@@ -161,8 +161,10 @@ compileProcedure (Proc _ ident params decls stmts)
         -- put prologue
         stackSize <- putProcedurePrologue params decls
         -- parameter passing
-        -- putComments "Passing parameters"
+        unless (null params) $ putComments "parameter passing"
+        -- put paramaters
         putParameters params
+        -- reset register
         resetReg
 
 
@@ -196,7 +198,7 @@ putCode s
 putComments :: String -> State SymTable ()
 putComments cmt
     = do
-        putCode $ "  # " ++ cmt ++ "\n"
+        putCode $ "# " ++ cmt ++ "\n"
 
 
 putPosition :: SourcePos -> String
@@ -226,15 +228,26 @@ putStatements (s:ss)
 putStatement :: Stmt -> State SymTable ()
 putStatement s
     = do
-        putStmtComment s
+        -- putStmtComment s
         compileStmt s
         resetReg
 
 
 putStmtComment :: Stmt -> State SymTable ()
-putStmtComment stmt 
+putStmtComment stmt
     = do
-        putCode $ "  # " ++ (stmtToStr 0 stmt)
+        putCode $ "# " ++ compileStmtComment stmt ++ "\n"
+
+compileStmtComment :: Stmt -> String
+compileStmtComment (Assign _ stmtVar expr)
+    = stmtVarToStr stmtVar ++ " := " ++ exprToStr False expr ++ ";"
+compileStmtComment (Read _ stmtVar) = "read " ++ stmtVarToStr stmtVar ++ ";"
+compileStmtComment (Write _ expr) = "write " ++ exprToStr False expr ++ ";"
+compileStmtComment (SWrite _ string) = "write \"" ++ string ++ "\";"
+compileStmtComment (Call _ ident exprs)
+    = "call " ++ ident ++ "(" ++ exprsToStr exprs ++ ");"
+compileStmtComment (If _ expr _ _) = "if " ++ exprToStr False expr
+compileStmtComment (While _ expr _) = "while " ++ exprToStr False expr
 
 compileStmts :: [Stmt] -> State SymTable ()
 compileStmts [] = return ()
@@ -335,26 +348,30 @@ putReadCodeType baseType
 ---------------------------------------------------------------------------------------------------------------------
 compileStmt :: Stmt -> State SymTable ()
 -- Assign statement
-compileStmt (Assign _ stmtVar expr)
+compileStmt (Assign pos stmtVar expr)
     = do
         regThis <- nextAvailableReg
+        putStmtComment (Assign pos stmtVar expr)
         exprType <- compileExpr regThis expr
         stmtType <- getStmtVarBaseType stmtVar
         if assignableType stmtType exprType 
-            then putAssignCode stmtVar regThis
+            then 
+                putAssignCode stmtVar regThis
             else error $ "assginment type dose not match" 
 
 -- Read statement
-compileStmt (Read _ stmtVar)
+compileStmt (Read pos stmtVar)
     = do
         reg <- nextAvailableReg
         baseType <- getStmtVarBaseType stmtVar
+        putStmtComment (Read pos stmtVar)
         putReadCodeType baseType
         putAssignCode stmtVar reg
 
 -- Write statement
-compileStmt (Write _ expr)
+compileStmt (Write pos expr)
     = do
+        putStmtComment (Write pos expr)
         baseType <- compileExpr 0 expr
         let func = case baseType of
                         BoolType -> "print_bool"
@@ -363,69 +380,81 @@ compileStmt (Write _ expr)
         putCode ("    call_builtin " ++ func ++ "\n")
 
 -- Write string statement
-compileStmt (SWrite _ string)
+compileStmt (SWrite pos string)
     = do
         reg <- nextAvailableReg
+        putStmtComment (SWrite pos string)
         putCode ("    string_const r" ++ show reg ++ ", \"" ++ string ++ "\"" ++ "\n")
         putCode ("    call_builtin print_string" ++ "\n")
 
 -- Call statement
-compileStmt (Call _ ident es)
+compileStmt (Call pos ident es)
     = do
         proc <- getProcdure ident
         if (length proc) == (length es)
             then 
                 do
+                    putStmtComment (Call pos ident es)
                     compileExprs ident 0 es
                     putCode ("    call proc_" ++ ident ++ "\n")
             else error $ "procedure call arity dose not matched \n"
 
 -- if then statement
-compileStmt (If _ expr stmts [])
+compileStmt (If pos expr stmts [])
     = do
         afterThen <- nextAvailableLabel
+        putStmtComment (If pos expr stmts [])
         exprType <- compileExpr 0 expr
         if exprType == BoolType 
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
+                    putCode ("# then\n")
                     compileStmts stmts
                     putStmtLabel afterThen
+                    putCode ("# fi\n")
         else
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
 -- if then else statement
-compileStmt (If _ expr thenStmts elseStmts)
+compileStmt (If pos expr thenStmts elseStmts)
     = do
         inElse <- nextAvailableLabel
         afterElse <- nextAvailableLabel
+        putStmtComment (If pos expr thenStmts elseStmts)
         exprType <- compileExpr 0 expr
         if exprType == BoolType 
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
+                    putCode ("# then\n")
                     compileStmts thenStmts
                     putCode ("    branch_uncond label_" ++ show(afterElse) ++ "\n")
                     putStmtLabel inElse
+                    putCode ("# else\n")
                     compileStmts elseStmts
                     putStmtLabel afterElse
+                    putCode ("# fi\n")
         else
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
 -- while statement
-compileStmt (While _ expr stmts)
+compileStmt (While pos expr stmts)
     = do
         inWhile <- nextAvailableLabel
         afterWhile <- nextAvailableLabel
+        putStmtComment (While pos expr stmts)
         putStmtLabel inWhile
         exprType <- compileExpr 0 expr
         if exprType == BoolType 
             then
                 do
                     putCode ("    branch_on_false r0, label_" ++ show afterWhile ++ "\n")
+                    putCode ("# do\n")
                     compileStmts stmts
                     putCode ("    branch_uncond label_" ++ show inWhile ++ "\n")
                     putStmtLabel afterWhile
+                    putCode ("# od\n")
         else
             error $ "Expression of While statement can not have type " ++ show(exprType)
 
@@ -562,7 +591,7 @@ putDeclComment declVar baseType
                         (DBaseVar ident) -> ident
                         (ShapeVar ident (SArray num)) -> ident ++ "[" ++ show num ++ "]"
                         (ShapeVar ident (SMatrix row col)) -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
-        putCode $ "  # initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
+        putCode $ "# initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
         return ()
 
 whichDeclReg :: Int -> Int -> Decl -> Int
@@ -804,7 +833,7 @@ putParameter (Param _ indicator baseType ident)
         slot <- nextAvailableSlot
         reg <- nextAvailableReg
         insertVariable ident ((indicator == Val), baseType, Single, slot)
-        putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "         # " ++ show indicator ++ " " ++ ident ++ "\n"
+        putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
 
 
 ------------------ Procedure Helper ----------------------
