@@ -1,38 +1,44 @@
+proc boo(ref int m, val int n)
+begin
+    write "test";
+    m := m + n;
+end
+
 proc main()
     int x;
     int y;
     int z;
 begin
-    # Assign test
-    x := 5;
 
-    # Read test
     read y;
 
     # Write test
-    write x;
+    # write x;
 
     # SWrite test
     write "SWrite Test\n";
 
+    # Call test
+    call boo(x, z);
+
     # Add test
-    z := x + y;
+    # z := x + y;
 
     # Sub test
-    z := x - y;
+    # z := x - y;
 
     # If test
-    if x > 0 then
-        write "x is bigger than zero\n";
-    else
-        write "x is smaller than zero\n";
-    fi
+    # if x > 0 then
+        # write "x is bigger than zero\n";
+    # else
+        # write "x is smaller than zero\n";
+    # fi
 
     # While test
-    while x > 0 do
-        x := x - 1;
-    od
+    # while x > 0 do
+        # x := x - 1;
+    # od
 
-    write "x should be zero: ";
-    write x;
-end 
+    # write "x should be zero: ";
+    # write x;
+end
