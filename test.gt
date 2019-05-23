@@ -5,5 +5,5 @@ proc main()
     int y;
     int z;
 begin
-    y := 10;
+    k := 10;
 end
