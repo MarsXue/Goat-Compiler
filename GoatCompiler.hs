@@ -396,7 +396,7 @@ compileStmt (If expr thenStmts elseStmts)
                 do
                     putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
                     compileStmts thenStmts
-                    putCode ("    branch_uncond r0, label_" ++ show(afterElse) ++ "\n")
+                    putCode ("    branch_uncond label_" ++ show(afterElse) ++ "\n")
                     putStmtLabel inElse
                     compileStmts elseStmts
                     putStmtLabel afterElse
