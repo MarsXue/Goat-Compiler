@@ -234,12 +234,9 @@ getStmtVarBaseType (IndexVar ident index)
         (isVal, baseType, varShape, slot) <- getVariable ident
         return baseType
 
-assginableType :: BaseType -> BaseType -> Bool
-assginableType st ex = 
-    if st == ex then True
-        else
-            if st == FloatType && ex == IntType then True
-                else False
+assignableType :: BaseType -> BaseType -> Bool
+assignableType FloatType IntType = True
+assignableType st ex = st == ex
 
 putAssignCode :: StmtVar -> Int -> State SymTable ()
 putAssignCode (SBaseVar ident) reg
@@ -301,7 +298,7 @@ compileStmt (Assign stmtVar expr)
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
         stmtType <- getStmtVarBaseType stmtVar
-        if assginableType stmtType exprType 
+        if assignableType stmtType exprType 
             then putAssignCode stmtVar regThis
             else error $ "assginment type dose not match" 
 ---------------------------------------------------------------------------------------------------------------------
