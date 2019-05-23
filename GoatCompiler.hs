@@ -7,6 +7,7 @@ import Data.Map (
     )
 import qualified Data.Map as Map
 import GoatAST
+import Text.Parsec.Pos
 
 data VarShape
     = Single
@@ -148,7 +149,7 @@ compileProcedures (p:ps)
 
 
 compileProcedure :: Proc -> State SymTable ()
-compileProcedure (Proc ident params decls stmts)
+compileProcedure (Proc _ ident params decls stmts)
     = do
         -- put label
         putProcedureLabel ident
@@ -191,6 +192,17 @@ putComments :: String -> State SymTable ()
 putComments cmt
     = do
         putCode $ "  # " ++ cmt ++ "\n"
+
+
+putPosition :: SourcePos -> String
+putPosition pos
+    = 
+        let name = sourceName pos
+            line = sourceLine pos
+            column = sourceColumn pos
+        in
+            show name ++ " Line " ++ show line ++ " Column " ++ show column ++ "\n"
+
 
 ----------- Statement Helper -----------
 
@@ -296,7 +308,7 @@ putAssignCodeRef addrSlot reg
         putCode $ "    store_indirect r" ++ show addrReg ++ ", r" ++ show reg ++ "\n"
 
 compileStmt :: Stmt -> State SymTable ()
-compileStmt (Assign stmtVar expr)
+compileStmt (Assign _ stmtVar expr)
     = do
         regThis <- nextAvailableReg
         exprType <- compileExpr regThis expr
@@ -307,7 +319,7 @@ compileStmt (Assign stmtVar expr)
 ---------------------------------------------------------------------------------------------------------------------
 
 -- Read statement
-compileStmt (Read (SBaseVar ident))
+compileStmt (Read _ (SBaseVar ident))
     = do
         reg <- nextAvailableReg
         putCode ("    call_builtin ")
@@ -325,7 +337,7 @@ compileStmt (Read (SBaseVar ident))
         putCode ("    store " ++ show slot ++ ", r" ++ show reg ++ "\n")
 
 -- Write statement
-compileStmt (Write expr)
+compileStmt (Write _ expr)
     = do
         baseType <- compileExpr 0 expr
         let func = case baseType of
@@ -335,14 +347,14 @@ compileStmt (Write expr)
         putCode ("    call_builtin " ++ func ++ "\n")
 
 -- Write string statement
-compileStmt (SWrite string)
+compileStmt (SWrite _ string)
     = do
         reg <- nextAvailableReg
         putCode ("    string_const r" ++ show reg ++ ", \"" ++ string ++ "\"" ++ "\n")
         putCode ("    call_builtin print_string" ++ "\n")
 
 -- Call statement
-compileStmt (Call ident es)
+compileStmt (Call _ ident es)
     = do
         proc <- getProcdure ident
         if (length proc) == (length es)
@@ -353,7 +365,7 @@ compileStmt (Call ident es)
             else error $ "procedure call arity dose not matched \n"
 
 -- if then statement
-compileStmt (If expr stmts [])
+compileStmt (If _ expr stmts [])
     = do
         afterThen <- nextAvailableLabel
         exprType <- compileExpr 0 expr
@@ -367,7 +379,7 @@ compileStmt (If expr stmts [])
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
 -- if then else statement
-compileStmt (If expr thenStmts elseStmts)
+compileStmt (If _ expr thenStmts elseStmts)
     = do
         inElse <- nextAvailableLabel
         afterElse <- nextAvailableLabel
@@ -385,7 +397,7 @@ compileStmt (If expr thenStmts elseStmts)
             error $ "Expression of If statement can not have type " ++ show(exprType)
 
 -- while statement
-compileStmt (While expr stmts)
+compileStmt (While _ expr stmts)
     = do
         inWhile <- nextAvailableLabel
         afterWhile <- nextAvailableLabel
@@ -418,7 +430,7 @@ compileExprs ident n (e:es)
 
             else
                 case e of
-                    (Id stmtVar) -> do
+                    (Id _ stmtVar) -> do
                         stmtVarType <- getStmtVarBaseType stmtVar
                         if stmtVarType == baseType
                             then storeAddressToRegN stmtVar n 
@@ -486,7 +498,7 @@ putDeclarations' ri rf (d:ds)
         putDeclarations' ri rf ds
 
 putDeclaration' :: Int -> Decl -> State SymTable ()
-putDeclaration' r (Decl baseType declVar)
+putDeclaration' r (Decl _ baseType declVar)
     = do
         case declVar of
             (DBaseVar ident)
@@ -513,30 +525,30 @@ putDeclaration' r (Decl baseType declVar)
 
 
 whichDeclReg :: Int -> Int -> Decl -> Int
-whichDeclReg ri rf (Decl baseType _)
+whichDeclReg ri rf (Decl _ baseType _)
     = if baseType == FloatType
         then rf
         else ri
 
 ----------- Expression Helper -----------
 compileExpr :: Int -> Expr -> State SymTable BaseType
-compileExpr reg (BoolConst b)
+compileExpr reg (BoolConst _ b)
     = do
         let boolint = if b then 1 else 0
         putCode ("    int_const r" ++ show reg ++ ", " ++ show boolint ++ "\n")
         return BoolType
 
-compileExpr reg (IntConst i)
+compileExpr reg (IntConst _ i)
     = do
         putCode ("    int_const r" ++ show reg ++ ", " ++ show i ++ "\n")
         return IntType
 
-compileExpr reg (FloatConst f)
+compileExpr reg (FloatConst _ f)
     = do
         putCode ("    real_const r" ++ show reg ++ ", " ++ show f ++ "\n")
         return FloatType
 
-compileExpr a (Add expr1 expr2)
+compileExpr a (Add _ expr1 expr2)
     = do
         type1 <- compileExpr a expr1
         type2 <- compileExpr (a+1) expr2
@@ -569,20 +581,20 @@ compileExpr a (Add expr1 expr2)
                     else
                         error $ "Can not minus " ++ show type1 ++ " with " ++ show type2 ++ "\n"
 
-compileExpr a (Minus expr1 expr2) = return FloatType
-compileExpr a (Mul expr1 expr2) = return FloatType
-compileExpr a (Div expr1 expr2) = return FloatType
-compileExpr a (Or expr1 expr2) = return BoolType
-compileExpr a (And expr1 expr2) = return BoolType
-compileExpr a (Equal expr1 expr2) = return BoolType
-compileExpr a (NotEqual expr1 expr2) = return BoolType
-compileExpr a (Less expr1 expr2) = return BoolType
-compileExpr a (LessEqual expr1 expr2) = return BoolType
-compileExpr a (Greater expr1 expr2) = return BoolType
-compileExpr a (GreaterEqual expr1 expr2) = return BoolType
-compileExpr a (Neg expr) = return BoolType
-compileExpr a (UMinus expr) = return FloatType
-compileExpr a (Id b) = return IntType
+compileExpr a (Minus _ expr1 expr2) = return FloatType
+compileExpr a (Mul _ expr1 expr2) = return FloatType
+compileExpr a (Div _ expr1 expr2) = return FloatType
+compileExpr a (Or _ expr1 expr2) = return BoolType
+compileExpr a (And _ expr1 expr2) = return BoolType
+compileExpr a (Equal _ expr1 expr2) = return BoolType
+compileExpr a (NotEqual _ expr1 expr2) = return BoolType
+compileExpr a (Less _ expr1 expr2) = return BoolType
+compileExpr a (LessEqual _ expr1 expr2) = return BoolType
+compileExpr a (Greater _ expr1 expr2) = return BoolType
+compileExpr a (GreaterEqual _ expr1 expr2) = return BoolType
+compileExpr a (Neg _ expr) = return BoolType
+compileExpr a (UMinus _ expr) = return FloatType
+compileExpr a (Id _ b) = return IntType
 
 
 ----------- Parameters Helper -----------
@@ -596,7 +608,7 @@ putParameters (p:ps)
 
 
 putParameter :: Param -> State SymTable ()
-putParameter (Param indicator baseType ident)
+putParameter (Param _ indicator baseType ident)
     = do
         slot <- nextAvailableSlot
         reg <- nextAvailableReg
@@ -634,7 +646,7 @@ getDeclsSize [] = 0
 getDeclsSize (d:ds) = (getDeclSize d) + (getDeclsSize ds)
 
 getDeclSize :: Decl -> Int
-getDeclSize (Decl _ declVar) =
+getDeclSize (Decl _ _ declVar) =
     case declVar of
         (DBaseVar _)
             -> 1
@@ -656,9 +668,9 @@ putProcedures (p:ps)
 
 
 putProcedure :: Proc -> State SymTable ()
-putProcedure (Proc ident params _ _)
+putProcedure (Proc _ ident params _ _)
     = do
-        let types = map (\(Param i bt _) -> ((i == Val), bt)) params
+        let types = map (\(Param _ i bt _) -> ((i == Val), bt)) params
         insertProcedure ident types
 
 

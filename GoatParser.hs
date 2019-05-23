@@ -9,6 +9,7 @@ import GoatFormat
 import GoatAST
 import Data.Char
 import Text.Parsec
+import Text.Parsec.Pos
 import Text.Parsec.Language (emptyDef)
 import qualified Text.Parsec.Token as Q
 import System.Environment
@@ -88,6 +89,8 @@ pProg
 pProc :: Parser Proc
 pProc
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "proc"
       reserved "proc"
       -- Parse procedure identifier
@@ -96,19 +99,21 @@ pProc
       params <- parens (pParam `sepBy` comma)
       -- Parse procedure body
       (decls, stmts) <- pProcBody
-      return (Proc ident params decls stmts)
+      return (Proc pos ident params decls stmts)
 
 -- Parser for parameter
 pParam :: Parser Param
 pParam
   = do
+      -- Get source position
+      pos <- getPosition
       -- Parse indicator: "val", "ref"
       indic <- pIndicator
       -- Parse base type: "bool", "int", "float"
       btype <- pBaseType
       -- Parse parameter identifier
       ident <- identifier
-      return (Param indic btype ident)
+      return (Param pos indic btype ident)
 
 -- Parser for parameter indicator
 pIndicator :: Parser Indicator
@@ -143,13 +148,15 @@ pProcBody
 pDecl :: Parser Decl
 pDecl
   = do
+      -- Get source position
+      pos <- getPosition
       -- Parse base type
       btype <- pBaseType
       -- Parse Variables
       dvar <- pDeclVar
       -- Declaration ends with semicolon ";"
       semi
-      return (Decl btype dvar)
+      return (Decl pos btype dvar)
 
 -- Parser for variables in declarations
 pDeclVar:: Parser DeclVar
@@ -269,6 +276,8 @@ pStmt
 -- Parser for assign statement
 pAssign
   = do
+      -- Get source position
+      pos <- getPosition
       -- Recognise the left value
       lvalue <- pStmtVar
       -- Reserved operator ":="
@@ -277,46 +286,54 @@ pAssign
       rvalue <- pExpr
       -- Assign statement ends with semicolon ";"
       semi
-      return (Assign lvalue rvalue)
+      return (Assign pos lvalue rvalue)
 
 -- Parser for read statement
 pRead
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "read"
       reserved "read"
       -- Recognise the variable
       var <- pStmtVar
       -- Read statement ends with semicolon ";"
       semi
-      return (Read var)
+      return (Read pos var)
 
 -- Parser for write expression statement
 pWrite
   = try (
       do
+        -- Get source position
+        pos <- getPosition
         -- Reserved token "write"
         reserved "write"
         -- Recognise the expression
         expr <- pExpr
         -- Write statement ends with semicolon ";"
         semi
-        return (Write expr)
+        return (Write pos expr)
     )
 
 -- Parser for write string statement
 pSWrite
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "write"
       reserved "write"
       -- Recognise the string
       str <- pString
       -- Write statement ends with semicolon ";"
       semi
-      return (SWrite str)
+      return (SWrite pos str)
 
 -- Parser for call statement
 pCall
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "call"
       reserved "call"
       -- Parse the identifier
@@ -325,11 +342,13 @@ pCall
       exprs <- parens (pExpr `sepBy` comma)
       -- Call statement ends with semicolon ";"
       semi
-      return (Call ident exprs)
+      return (Call pos ident exprs)
 
 -- Parser for If and If Else statements
 pIf
   = do
+      -- Get source position
+      pos <- getPosition
       -- Parse the common part "if <expr> then <stmt-list>"
       -- Reserved token "if"
       reserved "if"
@@ -356,11 +375,13 @@ pIf
           -- Reserved token "fi"
           reserved "fi"
           return []
-      return (If expr thsms elsms)
+      return (If pos expr thsms elsms)
 
 -- Parser for while statements "while <expr> do <stmt-list> od"
 pWhile
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "while"
       reserved "while"
       -- Parse the expression
@@ -371,7 +392,7 @@ pWhile
       stmts <- many1 pStmt
       -- Reserved token "od"
       reserved "od"
-      return (While expr stmts)
+      return (While pos expr stmts)
 
 -- Parser for string
 pString :: Parser String
@@ -406,10 +427,12 @@ pOrExpr
 pAndExpr
   = try (
       do
+        -- Get source position
+        pos <- getPosition
         -- Reserved operator "!"
         reservedOp "!"
         expr <- pNegExpr
-        return (Neg expr)
+        return (Neg pos expr)
     )
     <|>
     do
@@ -439,10 +462,12 @@ pTerm
 pFactor
   = try (
       do
+        -- Get source position
+        pos <- getPosition
         -- Reserved operator "-"
         reservedOp "-"
         expr <- pFactor
-        return (UMinus expr)
+        return (UMinus pos expr)
     )
     <|>
     do
@@ -465,50 +490,64 @@ pConst
 -- Parser for bool constant
 pBool
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "true"
       reserved "true"
-      return (BoolConst True)
+      return (BoolConst pos True)
     <|>
     do
+      -- Get source position
+      pos <- getPosition
       -- Reserved token "false"
       reserved "false"
-      return (BoolConst False)
+      return (BoolConst pos False)
 
 -- Parser for int or float constant
 pNum
   -- Try to parse the number into float type first
   = try (
       do
+        -- Get source position
+        pos <- getPosition
         n <- float
-        return (FloatConst (double2Float n :: Float))
+        return (FloatConst pos (double2Float n :: Float))
     )
     <|>
     -- Otherwise parse into int type
     do
+      -- Get source position
+      pos <- getPosition
       n <- natural
-      return (IntConst (fromInteger n :: Int))
+      return (IntConst pos (fromInteger n :: Int))
 
 -- Parser for Id in expression
 pIdent
   = do
+      -- Get source position
+      pos <- getPosition
       svar <- pStmtVar
-      return (Id svar)
+      return (Id pos svar)
 
 pOrOp, pAndOp, pComOp, pTermOp, pFactorOp :: Parser (Expr -> Expr -> Expr)
 
 -- Parser for Or operator
 pOrOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "||"
       reservedOp "||"
-      return Or
+      return (Or pos)
 
 -- Parser for And operator
 pAndOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "&&"
       reservedOp "&&"
-      return And
+      return (And pos)
 
 -- Parser for Compare operators
 pComOp
@@ -536,74 +575,94 @@ pGreaterOp, pGreaterEqualOp :: Parser (Expr -> Expr -> Expr)
 -- Parser for Equal operators
 pEqualOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "="
       reservedOp "="
-      return Equal
+      return (Equal pos)
 
 -- Parser for Not Equal operators
 pNotEqualOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "!="
       reservedOp "!="
-      return NotEqual
+      return (NotEqual pos)
 
 -- Parser for Less operators
 pLessOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "<"
       reservedOp "<"
-      return Less
+      return (Less pos)
 
 -- Parser for Less Equal operators
 pLessEqualOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "<="
       reservedOp "<="
-      return LessEqual
+      return (LessEqual pos)
 
 -- Parser for Greater operators
 pGreaterOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator ">"
       reservedOp ">"
-      return Greater
+      return (Greater pos)
 
 -- Parser for Greater Equal operators
 pGreaterEqualOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator ">="
       reservedOp ">="
-      return GreaterEqual
+      return (GreaterEqual pos)
 
 pAddOp, pMinusOp, pMulOp, pDivOp :: Parser (Expr -> Expr -> Expr)
 
 -- Parser for Add operators
 pAddOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "+"
       reservedOp "+"
-      return Add
+      return (Add pos)
 
 -- Parser for Minus operators
 pMinusOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "-"
       reservedOp "-"
-      return Minus
+      return (Minus pos)
 
 -- Parser for Mul operators
 pMulOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "*"
       reservedOp "*"
-      return Mul
+      return (Mul pos)
 
 -- Parser for Div operators
 pDivOp
   = do
+      -- Get source position
+      pos <- getPosition
       -- Reserved operator "/"
       reservedOp "/"
-      return Div
+      return (Div pos)
 
 -- Main Parser
 pMain :: Parser GoatProg
