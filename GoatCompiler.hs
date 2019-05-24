@@ -273,9 +273,13 @@ compileStmtComment (While _ expr _) = "while " ++ exprToStr False expr
 
 -- Compile statements (recursion)
 compileStmts :: [Stmt] -> State SymTable ()
-compileStmts [] = return ()
+compileStmts [] 
+  = do
+      resetReg 
+      return ()
 compileStmts (stmt:stmts)
   = do
+      resetReg
       compileStmt stmt
       compileStmts stmts
 ---------------------------------------------------------------------------------------------------------------------
@@ -409,8 +413,9 @@ compileStmt (Read pos stmtVar)
 -- Write statement
 compileStmt (Write pos expr)
   = do
+      reg <- nextAvailableReg
       putStmtComment (Write pos expr)
-      baseType <- compileExpr 0 expr
+      baseType <- compileExpr reg expr
       let func = case baseType of
                       BoolType -> "print_bool"
                       IntType -> "print_int"
@@ -428,37 +433,40 @@ compileStmt (SWrite pos string)
 -- Call statement
 compileStmt (Call pos ident es)
   = do
+      reg <- nextAvailableReg
       proc <- getProcdure ident pos
       if (length proc) == (length es) then
         do
           putStmtComment (Call pos ident es)
-          compileExprs ident 0 es
+          compileExprs ident reg es
           putCode ("    call proc_" ++ ident ++ "\n")
       else error $ putPosition pos ++ "procedure call arity dose not matched \n"
 
 -- If-then statement
 compileStmt (If pos expr stmts [])
   = do
+      reg <- nextAvailableReg
       afterThen <- nextAvailableLabel
       putStmtComment (If pos expr stmts [])
-      exprType <- compileExpr 0 expr
+      exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
           putCode ("    branch_on_false r0, label_" ++ show(afterThen) ++ "\n")
           putCode ("# then\n")
           compileStmts stmts
-          putStmtLabel afterThen
           putCode ("# fi\n")
+          putStmtLabel afterThen
       else
         error $ putPosition pos ++ "Expression of If statement can not have type " ++ show(exprType)
 
 -- If-then-else statement
 compileStmt (If pos expr thenStmts elseStmts)
   = do
+      reg <- nextAvailableReg
       inElse <- nextAvailableLabel
       afterElse <- nextAvailableLabel
       putStmtComment (If pos expr thenStmts elseStmts)
-      exprType <- compileExpr 0 expr
+      exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
           putCode ("    branch_on_false r0, label_" ++ show(inElse) ++ "\n")
@@ -476,19 +484,20 @@ compileStmt (If pos expr thenStmts elseStmts)
 -- While statement
 compileStmt (While pos expr stmts)
   = do
+      reg <- nextAvailableReg
       inWhile <- nextAvailableLabel
       afterWhile <- nextAvailableLabel
       putStmtComment (While pos expr stmts)
       putStmtLabel inWhile
-      exprType <- compileExpr 0 expr
+      exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
           putCode ("    branch_on_false r0, label_" ++ show afterWhile ++ "\n")
           putCode ("# do\n")
           compileStmts stmts
           putCode ("    branch_uncond label_" ++ show inWhile ++ "\n")
-          putStmtLabel afterWhile
           putCode ("# od\n")
+          putStmtLabel afterWhile
       else
         error $ putPosition pos ++ "Expression of While statement can not have type " ++ show(exprType)
 
@@ -695,12 +704,23 @@ compileExpr reg (Neg pos expr)
 compileExpr reg (UMinus pos expr)
   = do
       type1 <- compileExpr reg expr
-      if type1 == IntType || type1 == FloatType then
-        do
-          putCode ("    not r" ++ show reg ++ ", r" ++ show reg ++ "\n")
-          return type1
-      else
-        error $ putPosition pos ++ "Can not negate type " ++ show type1
+      -- if type1 == IntType || type1 == FloatType then
+      --   do
+      --     putCode ("    not r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+      --     return type1
+      -- else
+      --   error $ putPosition pos ++ "Can not negate type " ++ show type1
+      case type1 of
+        IntType
+          -> do
+                putCode ("    neg_int r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                return type1
+        FloatType
+          -> do
+                putCode ("    neg_real r" ++ show reg ++ ", r" ++ show reg ++ "\n")
+                return type1
+        _
+          -> error $ putPosition pos ++ "Can not negate type " ++ show type1
 
 compileExpr reg (Id pos (SBaseVar ident))
   = do
