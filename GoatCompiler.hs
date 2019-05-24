@@ -675,8 +675,8 @@ compileExpr reg (Mul pos expr1 expr2)          = compileArithmetricExpr "mul" re
 compileExpr reg (Div pos expr1 expr2)          = compileArithmetricExpr "div" reg expr1 expr2 pos
 compileExpr reg (Equal pos expr1 expr2)        = compileEqualityExpr "eq" reg expr1 expr2 pos
 compileExpr reg (NotEqual pos expr1 expr2)     = compileEqualityExpr "ne" reg expr1 expr2 pos
-compileExpr reg (Or pos expr1 expr2)           = compileLogicalExpr "or" reg expr1 expr2 pos
-compileExpr reg (And pos expr1 expr2)          = compileLogicalExpr "and" reg expr1 expr2 pos
+compileExpr reg (Or pos expr1 expr2)           = compileLogicalExpr "or" "true" reg expr1 expr2 pos
+compileExpr reg (And pos expr1 expr2)          = compileLogicalExpr "and" "false" reg expr1 expr2 pos
 compileExpr reg (Less pos expr1 expr2)         = compileCompareExpr "lt" reg expr1 expr2 pos
 compileExpr reg (LessEqual pos expr1 expr2)    = compileCompareExpr "le" reg expr1 expr2 pos
 compileExpr reg (Greater pos expr1 expr2)      = compileCompareExpr "gt" reg expr1 expr2 pos
@@ -811,15 +811,19 @@ compileEqualityExpr s reg expr1 expr2 pos
       else
         error $ putPosition pos ++ "Can not compare " ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
 
+compileExpr reg (And pos expr1 expr2)          = compileLogicalExpr "and" reg expr1 expr2 pos
+
 compileLogicalExpr :: String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
-compileLogicalExpr s reg expr1 expr2 pos
+compileLogicalExpr s boolstr reg expr1 expr2 pos
   = do
+      after <- nextAvailableLabel
       type1 <- compileExpr reg expr1
+      putCode ("    branch_on_" ++ boolstr ++ " r" ++ show reg ++ ", label_" ++ show after ++ "\n")
       type2 <- compileExpr (reg+1) expr2
+      putCode ("    " ++ s ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+      putStmtLabel after
       if type1 == BoolType && type2 == BoolType then
-        do
-          putCode ("    " ++ s ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
-          return BoolType
+        return BoolType
       else
         error $ putPosition pos ++ s ++ " operation can not be used between type " ++ show type1 ++ " and " ++ show type2
 
@@ -862,7 +866,7 @@ putParameters (param:params)
       putParameter param
       putParameters params
 
--- Put parameter 
+-- Put parameter
 putParameter :: Param -> State SymTable ()
 putParameter (Param pos indicator baseType ident)
   = do
@@ -956,9 +960,9 @@ checkMain
 
 -- Initial symbol table
 test :: GoatProg -> ((), SymTable)
-test prog 
-  = runState 
-      (compileProg prog) 
+test prog
+  = runState
+      (compileProg prog)
       (SymTable
         { labelCounter = 0
         , slotCounter = 0
