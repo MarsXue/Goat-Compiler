@@ -132,8 +132,8 @@ sameVarShapeType (Matrix _ _) (Matrix _ _) = True
 sameVarShapeType _ _ = False
 
 -- Return the procedure with given identifier
-getProcdure :: String -> SourcePos -> State SymTable ([(Bool, BaseType)])
-getProcdure ident pos
+getProcedure :: String -> SourcePos -> State SymTable ([(Bool, BaseType)])
+getProcedure ident pos
   = do
       st <- get
       case Map.lookup ident (procedures st) of
@@ -440,7 +440,7 @@ compileStmt (SWrite pos string)
 compileStmt (Call pos ident es)
   = do
       reg <- nextAvailableReg
-      proc <- getProcdure ident pos
+      proc <- getProcedure ident pos
       if (length proc) == (length es) then
         do
           putStmtComment (Call pos ident es)
@@ -482,8 +482,8 @@ compileStmt (If pos expr thenStmts elseStmts)
           putStmtLabel inElse
           putCode ("# else\n")
           compileStmts elseStmts
-          putStmtLabel afterElse
           putCode ("# fi\n")
+          putStmtLabel afterElse
       else
         error $ putPosition pos ++ "Expression of If statement can not have type " ++ show(exprType)
 
