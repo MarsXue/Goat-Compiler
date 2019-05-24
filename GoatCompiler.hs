@@ -513,7 +513,12 @@ compileExprs ident n (e:es)
           if exprType == baseType then
             compileExprs ident (n+1) es
           else
-            error $ putPosition pos ++ " procedure parameter dose not match "
+            if exprType == IntType && baseType == FloatType
+              then 
+                do
+                  putCode $ "    int_to_real r" ++ show n ++ ", r" ++ show n ++ "\n"
+                  compileExprs ident (n+1) es
+              else error $ putPosition pos ++ " procedure parameter dose not match "
       else
         case e of
           (Id _ stmtVar)
