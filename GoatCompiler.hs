@@ -811,9 +811,7 @@ compileEqualityExpr s reg expr1 expr2 pos
       else
         error $ putPosition pos ++ "Can not compare " ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
 
-compileExpr reg (And pos expr1 expr2)          = compileLogicalExpr "and" reg expr1 expr2 pos
-
-compileLogicalExpr :: String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
+compileLogicalExpr :: String -> String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
 compileLogicalExpr s boolstr reg expr1 expr2 pos
   = do
       after <- nextAvailableLabel

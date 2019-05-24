@@ -5,5 +5,7 @@ proc main()
     int y;
     int z;
 begin
-    k := 10;
+    if y = 0 || y / 0 = 0 then
+        write "success\n";
+    fi
 end
