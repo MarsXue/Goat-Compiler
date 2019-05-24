@@ -752,14 +752,15 @@ compileExpr reg (Id pos (SBaseVar ident))
 compileExpr reg (Id pos (IndexVar ident (IArray expr)))
   = do
       (_, baseType, varShape, slotnum) <- getVariable ident (Array 0) pos
-      exprType <- compileExpr (reg+1) expr
+      reg1 <- nextAvailableReg
+      exprType <- compileExpr reg1 expr
       case varShape of
         (Array n)
           -> do
                 if exprType == IntType then
                   do
                     putCode ("    load_address r" ++ show reg ++ ", " ++ show slotnum ++ "\n")
-                    putCode ("    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+                    putCode ("    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
                     putCode ("    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n")
                     return baseType
                 else
@@ -772,18 +773,21 @@ compileExpr reg (Id pos (IndexVar ident (IArray expr)))
 compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
   = do
       (_, baseType, varShape, slotnum) <- getVariable ident (Matrix 0 0) pos
-      type1 <- compileExpr (reg+1) expr1
-      type2 <- compileExpr (reg+2) expr2
+      reg1 <- nextAvailableReg
+      reg2 <- nextAvailableReg
+      type1 <- compileExpr reg1 expr1
+      type2 <- compileExpr reg2 expr2
       case varShape of
         (Matrix a b)
           -> do
                 if type1 == IntType && type2 == IntType then
                   do
-                    putCode $ "    int_const r" ++ show (reg+3) ++ ", " ++ show b ++ "\n"
-                    putCode $ "    mul_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+1) ++ "\n"
-                    putCode $ "    add_int r" ++ show (reg+3) ++ ", r" ++ show (reg+3) ++ ", r" ++ show (reg+2) ++ "\n"
+                    reg3 <- nextAvailableReg
+                    putCode $ "    int_const r" ++ show reg3 ++ ", " ++ show b ++ "\n"
+                    putCode $ "    mul_int r" ++ show reg3 ++ ", r" ++ show reg3 ++ ", r" ++ show reg1 ++ "\n"
+                    putCode $ "    add_int r" ++ show reg3 ++ ", r" ++ show reg3 ++ ", r" ++ show reg2 ++ "\n"
                     putCode $ "    load_address r" ++ show reg ++ ", " ++ show slotnum ++ "\n"
-                    putCode $ "    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+3) ++ "\n"
+                    putCode $ "    sub_offset r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg3 ++ "\n"
                     putCode $ "    load_indirect r" ++ show reg ++ ", r" ++ show reg ++ "\n"
                     return baseType
                 else
@@ -796,17 +800,18 @@ compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
 compileArithmetricExpr :: String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
 compileArithmetricExpr s reg expr1 expr2 pos
   = do
+      reg1 <- nextAvailableReg
       type1 <- compileExpr reg expr1
-      type2 <- compileExpr (reg+1) expr2
+      type2 <- compileExpr reg1 expr2
       if type1 == type2 then
         if type1 == IntType then
           do
-            putCode ("    " ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    " ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return IntType
         else
           if type1 == FloatType then
             do
-              putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+              putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
               return FloatType
           else
             error $ putPosition pos ++ "Can not " ++ s ++ " type " ++ show type1 ++ " with type " ++ show type2
@@ -814,13 +819,13 @@ compileArithmetricExpr s reg expr1 expr2 pos
         if type1 == IntType && type2 == FloatType then
           do
             putCode ("    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n")
-            putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return FloatType
         else
           if type1 == FloatType && type2 == IntType then
             do
-              putCode ("    int_to_real r" ++ show (reg+1) ++ ", r" ++ show (reg+1) ++ "\n")
-              putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+              putCode ("    int_to_real r" ++ show reg1 ++ ", r" ++ show reg1 ++ "\n")
+              putCode ("    " ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
               return FloatType
           else
             error $ putPosition pos ++ "Can not " ++ s ++ " type " ++ show type1 ++ " with type " ++ show type2
@@ -828,16 +833,17 @@ compileArithmetricExpr s reg expr1 expr2 pos
 compileEqualityExpr :: String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
 compileEqualityExpr s reg expr1 expr2 pos
   = do
+      reg1 <- nextAvailableReg
       type1 <- compileExpr reg expr1
-      type2 <- compileExpr (reg+1) expr2
+      type2 <- compileExpr reg1 expr2
       if type1 == type2 then
         if type1 == FloatType then
           do
-            putCode ("    cmp_" ++ s ++ "_real" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    cmp_" ++ s ++ "_real" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return BoolType
         else
           do
-            putCode ("    cmp_" ++ s ++ "_int" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    cmp_" ++ s ++ "_int" ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return BoolType
       else
         error $ putPosition pos ++ "Can not compare " ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
@@ -845,11 +851,12 @@ compileEqualityExpr s reg expr1 expr2 pos
 compileLogicalExpr :: String -> String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
 compileLogicalExpr s boolstr reg expr1 expr2 pos
   = do
+      reg1 <- nextAvailableReg
       after <- nextAvailableLabel
       type1 <- compileExpr reg expr1
       putCode ("    branch_on_" ++ boolstr ++ " r" ++ show reg ++ ", label_" ++ show after ++ "\n")
-      type2 <- compileExpr (reg+1) expr2
-      putCode ("    " ++ s ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+      type2 <- compileExpr reg1 expr2
+      putCode ("    " ++ s ++ " r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
       putStmtLabel after
       if type1 == BoolType && type2 == BoolType then
         return BoolType
@@ -859,28 +866,29 @@ compileLogicalExpr s boolstr reg expr1 expr2 pos
 compileCompareExpr :: String -> Int -> Expr -> Expr -> SourcePos -> State SymTable BaseType
 compileCompareExpr s reg expr1 expr2 pos
   = do
+      reg1 <- nextAvailableReg
       type1 <- compileExpr reg expr1
-      type2 <- compileExpr (reg+1) expr2
+      type2 <- compileExpr reg1 expr2
       if type1 == type2 then
         if type1 == FloatType then
           do
-            putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return BoolType
         else
           do
-            putCode ("    cmp_" ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+            putCode ("    cmp_" ++ s ++ "_int r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
             return BoolType
       else
         if type1 == IntType && type2 == FloatType then
           do
               putCode ("    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n")
-              putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+              putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
               return BoolType
         else
           if type1 == FloatType && type2 == IntType then
             do
-              putCode ("    int_to_real r" ++ show (reg+1) ++ ", r" ++ show (reg+1) ++ "\n")
-              putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show (reg+1) ++ "\n")
+              putCode ("    int_to_real r" ++ show reg1 ++ ", r" ++ show reg1 ++ "\n")
+              putCode ("    cmp_" ++ s ++ "_real r" ++ show reg ++ ", r" ++ show reg ++ ", r" ++ show reg1 ++ "\n")
               return BoolType
           else
               error $ putPosition pos ++ "Can not compare" ++ s ++ " with type " ++ show type1 ++ " and type " ++ show type2
