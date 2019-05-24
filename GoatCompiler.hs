@@ -513,17 +513,18 @@ compileExprs ident n (e:es)
   = do
       let pos = getExprPos e
       (isVal, baseType) <- getProcParameter ident n
+      n1 <- nextAvailableReg
       if isVal then
         do
           exprType <- compileExpr n e
           if exprType == baseType then
-            compileExprs ident (n+1) es
+            compileExprs ident n1 es
           else
             if exprType == IntType && baseType == FloatType
               then 
                 do
                   putCode $ "    int_to_real r" ++ show n ++ ", r" ++ show n ++ "\n"
-                  compileExprs ident (n+1) es
+                  compileExprs ident n1 es
               else error $ putPosition pos ++ " procedure parameter dose not match "
       else
         case e of
@@ -533,7 +534,7 @@ compileExprs ident n (e:es)
                   if stmtVarType == baseType then
                     do
                       storeAddressToRegN stmtVar n pos
-                      compileExprs ident (n+1) es
+                      compileExprs ident n1 es
                   else
                     error $ putPosition pos ++ " procedure parameter dose not match "
           _ -> error $ putPosition pos ++ " Ref procedure parameter dose not allow Non-lvalue "
