@@ -304,9 +304,14 @@ convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0)
 
 -- Check if two types can be assigned
 -- Note: Float can be assigned by Int
-assignableType :: BaseType -> BaseType -> Bool
-assignableType FloatType IntType = True
-assignableType st ex = st == ex
+assignableType :: BaseType -> BaseType -> Int -> State SymTable Bool
+assignableType FloatType IntType reg
+  = do
+      putCode $ "    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n"
+      return True
+assignableType st ex reg
+  = do 
+      return (st == ex)
 
 -- Put assignment code
 putAssignCode :: StmtVar -> Int -> SourcePos -> State SymTable ()
@@ -396,7 +401,8 @@ compileStmt (Assign pos stmtVar expr)
       putStmtComment (Assign pos stmtVar expr)
       exprType <- compileExpr regThis expr
       stmtType <- getStmtVarBaseType stmtVar pos
-      if assignableType stmtType exprType then
+      assignable <- assignableType stmtType exprType regThis
+      if assignable then
         putAssignCode stmtVar regThis pos
       else
         error $ putPosition pos ++ "assginment type dose not match"
