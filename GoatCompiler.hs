@@ -96,6 +96,12 @@ resetReg
       st <- get
       put $ st { regCounter = 0 }
 
+setReg :: Int -> State SymTable ()
+setReg n
+  = do
+      st <- get
+      put $ st {regCounter = n}
+
 -- Reset variable map in symbol table
 resetVariable :: State SymTable ()
 resetVariable
@@ -513,17 +519,20 @@ compileExprs ident n (e:es)
   = do
       let pos = getExprPos e
       (isVal, baseType) <- getProcParameter ident n
-      n1 <- nextAvailableReg
       if isVal then
         do
           exprType <- compileExpr n e
+          setReg (n+1)
           if exprType == baseType then
-            compileExprs ident n1 es
+            do
+              n1 <- nextAvailableReg
+              compileExprs ident n1 es
           else
             if exprType == IntType && baseType == FloatType
               then 
                 do
                   putCode $ "    int_to_real r" ++ show n ++ ", r" ++ show n ++ "\n"
+                  n1 <- nextAvailableReg
                   compileExprs ident n1 es
               else error $ putPosition pos ++ " procedure parameter dose not match "
       else
@@ -534,6 +543,8 @@ compileExprs ident n (e:es)
                   if stmtVarType == baseType then
                     do
                       storeAddressToRegN stmtVar n pos
+                      setReg (n+1)
+                      n1 <- nextAvailableReg
                       compileExprs ident n1 es
                   else
                     error $ putPosition pos ++ " procedure parameter dose not match "
