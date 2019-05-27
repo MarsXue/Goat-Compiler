@@ -1,20 +1,23 @@
----------------------------------------------------------
--- Programming Language Implementation COMP90045 Project1
--- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
----------------------------------------------------------
+-----------------------------------------------------------
+-- COMP90045 Programming Language Implementation Project --
+--                     Goat Compiler                     --
+--  Implemented by Shjie Liu, Wenqing Xue, Minjian Chen  --
+-----------------------------------------------------------
 
 module Main (main) where
 
 import GoatParser (ast)
-import GoatCompiler (test, getCode)
+import GoatCompiler (initial, getCode)
 import GoatFormat (progToStr)
 import System.Environment (getProgName, getArgs)
 import System.Exit (exitWith, ExitCode(..))
 
+-- Used to distinguish the output
 data Task
   = Pprint | Compile | Parse
   deriving (Eq, Show)
 
+-- Main function for Goat compiler
 main :: IO()
 main
   = do
@@ -30,9 +33,7 @@ main
             let output = ast input
             case output of
               Right tree -> do
-                              -- putStrLn $ show (test tree)
-                              -- putStr "\n\n\n\n\n\n"
-                              putStr $ getCode (test tree)
+                              putStr $ getCode (initial tree)
               Left   err -> do
                               putStr "Parse error at "
                               print err

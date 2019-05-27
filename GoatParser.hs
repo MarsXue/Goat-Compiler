@@ -1,7 +1,10 @@
----------------------------------------------------------
--- Programming Language Implementation COMP90045 Project1
--- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
----------------------------------------------------------
+-----------------------------------------------------------
+-- COMP90045 Programming Language Implementation Project --
+--                     Goat Compiler                     --
+-- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen   --
+-----------------------------------------------------------
+
+-- Goat Parser
 
 module GoatParser where
 

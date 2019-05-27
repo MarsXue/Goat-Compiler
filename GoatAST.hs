@@ -1,15 +1,14 @@
----------------------------------------------------------
--- Programming Language Implementation COMP90045 Project1
--- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen
----------------------------------------------------------
+-----------------------------------------------------------
+-- COMP90045 Programming Language Implementation Project --
+--                     Goat Compiler                     --
+-- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen   --
+-----------------------------------------------------------
+
+-- Goat Abstract Syntax Tree
 
 module GoatAST where
 
 import Text.Parsec.Pos
-
------------------------------------
--- Specification of an AST for Goat
------------------------------------
 
 -- Identifier: String
 type Ident = String
@@ -86,7 +85,7 @@ data Expr
 
 -- Declaration
 data Decl
-  -- Pos: position
+  -- Pos:      position
   -- BaseType: base type
   -- DeclVar:  declaration variable
   = Decl Pos BaseType DeclVar
@@ -94,7 +93,7 @@ data Decl
 
 -- Statement
 data Stmt
-  -- Pos: position
+  -- Pos:     position
   -- StmtVar: statement variable
   -- Expr:    expression
   -- Ident:   identifier
@@ -110,7 +109,7 @@ data Stmt
 
 -- Parameter
 data Param
-  -- Pos: position
+  -- Pos:       position
   -- Indicator: indicator
   -- BaseType:  base type
   -- Ident:     identifier
@@ -119,7 +118,7 @@ data Param
 
 -- Procedure
 data Proc
-  -- Pos: position
+  -- Pos:     position
   -- Ident:   identifier
   -- [Param]: list of parameters
   -- [Decl]:  list of declarations
