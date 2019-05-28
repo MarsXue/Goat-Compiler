@@ -35,7 +35,7 @@ main
               Right tree -> do
                               putStr $ getCode (initial tree)
               Left   err -> do
-                              putStr "Parse error at "
+                              putStr "Compile error at "
                               print err
                               exitWith (ExitFailure 3)
         Parse
