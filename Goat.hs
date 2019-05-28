@@ -37,7 +37,7 @@ main
               Left   err -> do
                               putStr "Parse error at "
                               print err
-                              exitWith (ExitFailure 2)
+                              exitWith (ExitFailure 3)
         Parse
           -> do
                 let [_, filename] = args
