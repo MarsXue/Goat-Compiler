@@ -35,7 +35,7 @@ main
               Right tree -> do
                               putStr $ getCode (initial tree)
               Left   err -> do
-                              putStr "Compile error at "
+                              putStr "Syntax error at "
                               print err
                               exitWith (ExitFailure 3)
         Parse
@@ -48,7 +48,7 @@ main
                   Right tree -> do
                                   putStrLn (show tree)
                   Left   err -> do
-                                  putStr "Parse error at "
+                                  putStr "Syntax error at "
                                   print err
                                   exitWith (ExitFailure 2)
         Pprint
@@ -60,7 +60,7 @@ main
                 case output of
                   Right tree -> putStr $ progToStr tree
                   Left   err -> do
-                                  putStr "Parse error at "
+                                  putStr "Syntax error at "
                                   print err
                                   exitWith (ExitFailure 2)
 
