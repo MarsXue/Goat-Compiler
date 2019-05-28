@@ -271,7 +271,7 @@ compileStmt (Assign pos stmtVar expr)
       if assignable then
         putAssignCode stmtVar regThis pos
       else
-        error $ putPosition pos ++ "Assignment type dose not match"
+        error $ putPosition pos ++ "Assignment types are not matched"
 
 -- Read statement
 compileStmt (Read pos stmtVar)
@@ -318,7 +318,7 @@ compileStmt (Call pos ident es)
           compileExprs ident reg es
           -- Call ident procedure
           putCode $ "    call proc_" ++ ident ++ "\n"
-      else error $ putPosition pos ++ "Call procedure dose not matched\n"
+      else error $ putPosition pos ++ "Call procedure does not matched"
 
 -- If-then statement
 compileStmt (If pos expr stmts [])
@@ -502,7 +502,7 @@ putAssignCode (IndexVar ident (IArray expr)) reg pos
       if exprType == IntType then
         putAssignCodeOffset offsetReg slot reg
       else
-        error $ putPosition pos ++ "Array index is not Int"
+        error $ putPosition pos ++ "Array index is not integer"
 -- Matrix case
 putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg pos
   = do
@@ -517,7 +517,7 @@ putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg pos
           putSetOffsetReg offsetReg colReg col
           putAssignCodeOffset offsetReg slot reg
       else
-        error $ putPosition pos ++ "Matrix index is not Int"
+        error $ putPosition pos ++ "Matrix index is not integer"
 
 -- Put calculation of offset register for Matrix
 putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
@@ -593,7 +593,7 @@ storeAddressToRegN (IndexVar ident (IArray expr)) destReg pos
       if exprType == IntType then
         putStoreAddressCodeOffset offsetReg slot destReg
       else
-        error $ putPosition pos ++ " Array index is not Int " ++ ident
+        error $ putPosition pos ++ "Array index is not integer"
 -- Case of the variable is matrix
 storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
   = do
@@ -607,7 +607,7 @@ storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
           putSetOffsetReg offsetReg colReg col
           putStoreAddressCodeOffset offsetReg slot destReg
       else
-        error $ putPosition pos ++ " Matrix index is not Int " ++ ident
+        error $ putPosition pos ++ "Matrix index is not integer"
 
 -- Add the code of storing slot address into given register
 putStoreAddressCodeOffset :: Int -> Int -> Int -> State SymTable ()
@@ -867,7 +867,7 @@ compileExprs ident n (e:es)
                 n1 <- nextAvailableReg
                 compileExprs ident n1 es
             else error $ putPosition pos
-                      ++ " Procedure parameter dose not match "
+                      ++ "Procedure parameter does not match"
       else
         -- Call by reference
         case e of
@@ -882,9 +882,9 @@ compileExprs ident n (e:es)
                       compileExprs ident n1 es
                   else
                     error $  putPosition pos
-                          ++ " Procedure parameter dose not match"
+                          ++ "Procedure parameter does not match"
           _ -> error $ putPosition pos
-                    ++ " Ref procedure parameter dose not allow Non-lvalue"
+                    ++ "Ref procedure parameter does not allow Non-lvalue"
 
 ----------- Expression Helper -----------
 -- Compile arithmetric expression, including
@@ -983,7 +983,7 @@ compileLogicalExpr s boolstr reg expr1 expr2 pos
         return BoolType
       else
         error $  putPosition pos ++ s
-              ++ " operation can not be used between type "
+              ++ " operation can not be used between "
               ++ show type1 ++ " and " ++ show type2
 
 -- Compile compare expression, including ">=", "<=", ">", "<"
