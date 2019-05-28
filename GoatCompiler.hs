@@ -96,7 +96,7 @@ insertVariable ident (isVal, bt, vs, slot) pos
       if Map.member ident (variables st) then
         error $ putPosition pos ++ "duplicate variable " ++ ident
       else
-        put $ st { variables 
+        put $ st { variables
                  = Map.insert ident (isVal, bt, vs, slot) (variables st) }
 
 -- Reset slot counter in symbol table
@@ -149,7 +149,7 @@ getVariable ident vs pos
           -> if sameVarShapeType vs varShape then
                 return (isVal, baseType, varShape, slot)
              -- Types are not matched
-             else error $  putPosition pos 
+             else error $  putPosition pos
                         ++ "type of variable is not matching " ++ ident
 
 -- Check given var shapes are the same type
@@ -393,9 +393,9 @@ compileStmt (While pos expr stmts)
 
 -- Compile statements (recursion)
 compileStmts :: [Stmt] -> State SymTable ()
-compileStmts [] 
+compileStmts []
   = do
-      resetReg 
+      resetReg
       return ()
 compileStmts (stmt:stmts)
   = do
@@ -471,7 +471,7 @@ assignableType FloatType IntType reg
       putCode $ "    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n"
       return True
 assignableType st ex reg
-  = do 
+  = do
       return (st == ex)
 
 -- Put assignment code
@@ -539,7 +539,7 @@ putAssignCodeOffset offsetReg startSlot reg
       -- Subtract address with offset
       putCode $  "    sub_offset r" ++ show addrReg ++ ", r"
               ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
-      -- Store indirect to address 
+      -- Store indirect to address
       putCode $  "    store_indirect r" ++ show addrReg
               ++ ", r" ++ show reg ++ "\n"
 
@@ -551,7 +551,7 @@ putAssignCodeRef addrSlot reg
       -- Load address to register
       putCode $  "    load r" ++ show addrReg ++ ", "
               ++ show addrSlot ++ "\n"
-      -- Store indirect to address 
+      -- Store indirect to address
       putCode $  "    store_indirect r" ++ show addrReg
               ++ ", r" ++ show reg ++ "\n"
 
@@ -568,7 +568,7 @@ putReadCodeType baseType
 
 -- Store the statement variable address to a specifity register
 storeAddressToRegN :: StmtVar -> Int -> SourcePos -> State SymTable ()
--- Case of the variable is not shaped 
+-- Case of the variable is not shaped
 storeAddressToRegN (SBaseVar ident) destReg pos
   = do
       (isVal, _, _, slot) <- getVariable ident (Single) pos
@@ -737,7 +737,7 @@ compileExpr reg (UMinus pos expr)
           -> error $ putPosition pos
                   ++ "Can not negate type " ++ show baseType
 
--- Compile Id expression where Id is a base statement variable 
+-- Compile Id expression where Id is a base statement variable
 compileExpr reg (Id pos (SBaseVar ident))
   = do
       (isVal, baseType, varShape, slot) <- getVariable ident (Single) pos
@@ -760,7 +760,7 @@ compileExpr reg (Id pos (SBaseVar ident))
         error $  putPosition pos ++ "Expected type " ++ show varShape
               ++ ", while type Single received"
 
--- Compile Id expression where Id is a array statement variable 
+-- Compile Id expression where Id is a array statement variable
 compileExpr reg (Id pos (IndexVar ident (IArray expr)))
   = do
       (_, baseType, varShape, slot) <- getVariable ident (Array 0) pos
@@ -777,7 +777,7 @@ compileExpr reg (Id pos (IndexVar ident (IArray expr)))
                     -- Calculate address using offset
                     putCode $  "    sub_offset r" ++ show reg ++ ", r"
                             ++ show reg ++ ", r" ++ show reg1 ++ "\n"
-                    -- Load value indirectly to address 
+                    -- Load value indirectly to address
                     putCode $  "    load_indirect r" ++ show reg ++ ", r"
                             ++ show reg ++ "\n"
                     return baseType
@@ -792,7 +792,7 @@ compileExpr reg (Id pos (IndexVar ident (IArray expr)))
           -> error $ putPosition pos
           ++ "Expect Matrix expression, while Array expression is given"
 
--- Compile Id expression where Id is a matrix statement variable 
+-- Compile Id expression where Id is a matrix statement variable
 compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
   = do
       (_, baseType, varShape, slot) <- getVariable ident (Matrix 0 0) pos
@@ -806,22 +806,18 @@ compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
                 if type1 == IntType && type2 == IntType then
                   do
                     reg3 <- nextAvailableReg
-                    -- TODO
+                    -- calculate the offset using the index of the matrix
                     putCode $  "    int_const r" ++ show reg3 ++ ", "
                             ++ show b ++ "\n"
-                    -- TODO
                     putCode $  "    mul_int r" ++ show reg3 ++ ", r"
                             ++ show reg3 ++ ", r" ++ show reg1 ++ "\n"
-                    -- TODO
                     putCode $  "    add_int r" ++ show reg3 ++ ", r"
                             ++ show reg3 ++ ", r" ++ show reg2 ++ "\n"
-                    -- TODO
                     putCode $  "    load_address r" ++ show reg ++ ", "
                             ++ show slot ++ "\n"
-                    -- TODO
                     putCode $  "    sub_offset r" ++ show reg ++ ", r"
                             ++ show reg ++ ", r" ++ show reg3 ++ "\n"
-                    -- TODO
+                    -- load the value stored in the slot with the address
                     putCode $  "    load_indirect r" ++ show reg ++ ", r"
                             ++ show reg ++ "\n"
                     return baseType
@@ -837,7 +833,7 @@ compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
           -> error $ putPosition pos
           ++ "Expect Array expression, while Matrix expression is given"
 
--- Compile a list of expressions and store given results into registers starting from r0          
+-- Compile a list of expressions and store given results into registers starting from r0
 compileExprs :: String -> Int -> [Expr] -> State SymTable ()
 compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
@@ -854,7 +850,7 @@ compileExprs ident n (e:es)
               n1 <- nextAvailableReg
               compileExprs ident n1 es
           else
-            if exprType == IntType && baseType == FloatType then 
+            if exprType == IntType && baseType == FloatType then
               do
                 -- Convert int to float type
                 putCode $  "    int_to_real r" ++ show n
@@ -882,7 +878,7 @@ compileExprs ident n (e:es)
                     ++ " Ref procedure parameter dose not allow Non-lvalue"
 
 ----------- Expression Helper -----------
-
+--Compile arithmetric expression including "add", "minus", "multip1y" and "divide"
 compileArithmetricExpr :: String -> Int -> Expr -> Expr
                        -> SourcePos -> State SymTable BaseType
 compileArithmetricExpr s reg expr1 expr2 pos
@@ -893,14 +889,14 @@ compileArithmetricExpr s reg expr1 expr2 pos
       if type1 == type2 then
         if type1 == IntType then
           do
-            -- TODO
+            -- oz arithmetic operation for int
             putCode $  "    " ++ s ++ "_int r" ++ show reg ++ ", r"
                     ++ show reg ++ ", r" ++ show reg1 ++ "\n"
             return IntType
         else
           if type1 == FloatType then
             do
-              -- TODO
+              -- oz arithmetic operation for float
               putCode $  "    " ++ s ++ "_real r" ++ show reg ++ ", r"
                       ++ show reg ++ ", r" ++ show reg1 ++ "\n"
               return FloatType
@@ -909,20 +905,20 @@ compileArithmetricExpr s reg expr1 expr2 pos
       else
         if type1 == IntType && type2 == FloatType then
           do
-            -- TODO
+            -- convert int type to float type
             putCode $  "    int_to_real r" ++ show reg ++ ", r"
                     ++ show reg ++ "\n"
-            -- TODO
+            -- oz arithmetic operation for float
             putCode $  "    " ++ s ++ "_real r" ++ show reg ++ ", r"
                     ++ show reg ++ ", r" ++ show reg1 ++ "\n"
             return FloatType
         else
           if type1 == FloatType && type2 == IntType then
             do
-              -- TODO
+              -- convert int type to float type
               putCode $  "    int_to_real r" ++ show reg1 ++ ", r"
                       ++ show reg1 ++ "\n"
-              -- TODO
+              -- oz arithmetic operation for float
               putCode $  "    " ++ s ++ "_real r" ++ show reg ++ ", r"
                       ++ show reg ++ ", r" ++ show reg1 ++ "\n"
               return FloatType
@@ -930,6 +926,7 @@ compileArithmetricExpr s reg expr1 expr2 pos
             error $  putPosition pos ++ "Can not " ++ s ++ " type "
                   ++ show type1 ++ " with type " ++ show type2
 
+-- compile equality expression, including "=" and "!="
 compileEqualityExpr :: String -> Int -> Expr -> Expr
                     -> SourcePos -> State SymTable BaseType
 compileEqualityExpr s reg expr1 expr2 pos
@@ -954,6 +951,7 @@ compileEqualityExpr s reg expr1 expr2 pos
         error $  putPosition pos ++ "Can not compare " ++ s
               ++ " with type " ++ show type1 ++ " and type " ++ show type2
 
+-- compile logical expression, including "and" and "or"
 compileLogicalExpr :: String -> String -> Int -> Expr -> Expr
                    -> SourcePos -> State SymTable BaseType
 compileLogicalExpr s boolstr reg expr1 expr2 pos
@@ -961,14 +959,14 @@ compileLogicalExpr s boolstr reg expr1 expr2 pos
       reg1 <- nextAvailableReg
       after <- nextAvailableLabel
       type1 <- compileExpr reg expr1
-      -- TODO
+      -- jump to the label beacuse of short circuit
       putCode $  "    branch_on_" ++ boolstr ++ " r"
               ++ show reg ++ ", label_" ++ show after ++ "\n"
       type2 <- compileExpr reg1 expr2
-      -- TODO
+      -- compile logical expression
       putCode $  "    " ++ s ++ " r" ++ show reg ++ ", r"
               ++ show reg ++ ", r" ++ show reg1 ++ "\n"
-      -- TODO
+      -- put the label for short circuit
       putCode $  "label_" ++ show after ++ ":\n"
       if type1 == BoolType && type2 == BoolType then
         return BoolType
@@ -977,6 +975,7 @@ compileLogicalExpr s boolstr reg expr1 expr2 pos
               ++ " operation can not be used between type "
               ++ show type1 ++ " and " ++ show type2
 
+-- compile compare expression, including ">=", "<=", ">", "<"
 compileCompareExpr :: String -> Int -> Expr -> Expr
                    -> SourcePos -> State SymTable BaseType
 compileCompareExpr s reg expr1 expr2 pos
@@ -1042,7 +1041,7 @@ getExprPos (Neg pos _)            = pos
 getExprPos (UMinus pos _)         = pos
 
 ----------- Declartion Helper -----------
-
+-- compile the declarations of a procedure
 putDeclarations :: [Decl] -> State SymTable ()
 putDeclarations [] = return ()
 putDeclarations ds
@@ -1055,6 +1054,7 @@ putDeclarations ds
       putCode $ "    real_const r" ++ show rf ++ ", 0.0\n"
       putDeclarations' ri rf ds
 
+-- compile the declarations of a precedure using the given two register number
 putDeclarations' :: Int -> Int -> [Decl] -> State SymTable ()
 putDeclarations' _ _ [] = return ()
 putDeclarations' ri rf (d:ds)
@@ -1063,6 +1063,7 @@ putDeclarations' ri rf (d:ds)
       putDeclaration' r d
       putDeclarations' ri rf ds
 
+-- compile a declaration
 putDeclaration' :: Int -> Decl -> State SymTable ()
 putDeclaration' r (Decl pos baseType declVar)
   = do
@@ -1072,7 +1073,7 @@ putDeclaration' r (Decl pos baseType declVar)
                 putDeclComment (DBaseVar ident) baseType
                 slot <- nextAvailableSlot
                 insertVariable ident (True, baseType, Single, slot) pos
-                -- TODO Store
+                -- store a register value into a slot
                 putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
         (ShapeVar ident shape)
           -> case shape of
@@ -1081,7 +1082,7 @@ putDeclaration' r (Decl pos baseType declVar)
                       putDeclComment (ShapeVar ident (SArray num)) baseType
                       slot <- nextAvailableSlot
                       insertVariable ident (True, baseType, (Array num), slot) pos
-                      -- TODO Store
+                      -- store a register value into a slot
                       putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                       putFilledSkipSlot r (num - 1)
               (SMatrix row col)
@@ -1089,16 +1090,17 @@ putDeclaration' r (Decl pos baseType declVar)
                       putDeclComment (ShapeVar ident (shape)) baseType
                       slot <- nextAvailableSlot
                       insertVariable ident (True, baseType, (Matrix row col), slot) pos
-                      -- TODO Store
+                      -- store a register value into a slot
                       putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
                       putFilledSkipSlot r (row * col - 1)
 
+-- skip the slot number for
 putFilledSkipSlot :: Int -> Int -> State SymTable ()
 putFilledSkipSlot _ 0 = return ()
 putFilledSkipSlot r num
   = do
       slot <- nextAvailableSlot
-      -- TODO Store
+      -- store a register value into a slot
       putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
       putFilledSkipSlot r (num - 1)
 
@@ -1124,6 +1126,7 @@ putDeclComment declVar baseType
       putCode $ "# initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
       return ()
 
+--determine which register to use according to the declaration base type
 whichDeclReg :: Int -> Int -> Decl -> Int
 whichDeclReg ri rf (Decl _ baseType _)
   = if baseType == FloatType then rf else ri
