@@ -566,8 +566,9 @@ putReadCodeType baseType
       -- Call built-in read function
       putCode $ "    call_builtin " ++ func
 
-
+-- Store the statement variable address to a specifity register
 storeAddressToRegN :: StmtVar -> Int -> SourcePos -> State SymTable ()
+-- Case of the variable is not shaped 
 storeAddressToRegN (SBaseVar ident) destReg pos
   = do
       (isVal, _, _, slot) <- getVariable ident (Single) pos
@@ -578,7 +579,7 @@ storeAddressToRegN (SBaseVar ident) destReg pos
         -- TODO
         putCode $  "    load_address r" ++ show destReg
                 ++ ", " ++ show slot ++ "\n"
-
+-- Case of the variable is array
 storeAddressToRegN (IndexVar ident (IArray expr)) destReg pos
   = do
       (_, _, _, slot) <- getVariable ident (Array 0) pos
@@ -588,7 +589,7 @@ storeAddressToRegN (IndexVar ident (IArray expr)) destReg pos
         putStoreAddressCodeOffset offsetReg slot destReg
       else
         error $ putPosition pos ++ " Array index is not Int " ++ ident
-
+-- Case of the variable is matrix
 storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
   = do
       (_, _, (Matrix row col), slot) <- getVariable ident (Matrix 0 0) pos
@@ -603,6 +604,7 @@ storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
       else
         error $ putPosition pos ++ " Matrix index is not Int " ++ ident
 
+-- Add the code of storing slot address into given register
 putStoreAddressCodeOffset :: Int -> Int -> Int -> State SymTable ()
 putStoreAddressCodeOffset offsetReg startSlot destReg
   = do
@@ -735,6 +737,7 @@ compileExpr reg (UMinus pos expr)
           -> error $ putPosition pos
                   ++ "Can not negate type " ++ show baseType
 
+-- Compile Id expression where Id is a base statement variable 
 compileExpr reg (Id pos (SBaseVar ident))
   = do
       (isVal, baseType, varShape, slot) <- getVariable ident (Single) pos
@@ -757,6 +760,7 @@ compileExpr reg (Id pos (SBaseVar ident))
         error $  putPosition pos ++ "Expected type " ++ show varShape
               ++ ", while type Single received"
 
+-- Compile Id expression where Id is a array statement variable 
 compileExpr reg (Id pos (IndexVar ident (IArray expr)))
   = do
       (_, baseType, varShape, slot) <- getVariable ident (Array 0) pos
@@ -788,6 +792,7 @@ compileExpr reg (Id pos (IndexVar ident (IArray expr)))
           -> error $ putPosition pos
           ++ "Expect Matrix expression, while Array expression is given"
 
+-- Compile Id expression where Id is a matrix statement variable 
 compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
   = do
       (_, baseType, varShape, slot) <- getVariable ident (Matrix 0 0) pos
@@ -832,6 +837,7 @@ compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
           -> error $ putPosition pos
           ++ "Expect Array expression, while Matrix expression is given"
 
+-- Compile a list of expressions and store given results into registers starting from r0          
 compileExprs :: String -> Int -> [Expr] -> State SymTable ()
 compileExprs _ _ [] = return ()
 compileExprs ident n (e:es)
