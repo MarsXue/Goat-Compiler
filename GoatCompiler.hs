@@ -37,7 +37,7 @@ data SymTable
     } deriving (Show)
 
 
------------SymTable Helper-----------
+----------- SymTable Helper -----------
 
 -- Return the next available slot number
 -- Slot counter increases in symbol table
@@ -127,7 +127,7 @@ resetVariable
       st <- get
       put $ st { variables = Map.empty }
 
--- Reset procedure map in symbol table
+-- Reset procedure counters after a procedure in symbol table
 resetProcedure :: State SymTable ()
 resetProcedure
   = do
@@ -178,7 +178,27 @@ getProcParameter ident idx
       return $ (procedures st) ! ident !! idx
 
 
------------Main Compiler-----------
+---------------------- Common Helper ----------------------
+
+-- Put given string into code string
+putCode :: String -> State SymTable ()
+putCode str
+  = do
+      st <- get
+      let c = code st
+      put $ st { code = c ++ str }
+
+-- Return position string from SourcePos
+putPosition :: SourcePos -> String
+putPosition pos
+  = let
+      line = sourceLine pos
+      column = sourceColumn pos
+    in
+      "Line " ++ show line ++ " Column " ++ show column ++ "\n"
+
+
+----------- Main Compiler -----------
 
 -- Compile Goat program
 compileProg :: GoatProg -> State SymTable ()
@@ -196,7 +216,7 @@ compileProg (Prog ps)
       compileProcedures ps
 
 
------------Procedure Compiler-----------
+----------- Procedure Compiler -----------
 
 -- Compile procedures (recursion)
 compileProcedures :: [Proc] -> State SymTable ()
@@ -234,205 +254,8 @@ compileProcedure (Proc _ ident params decls stmts)
       resetProcedure
       return ()
 
+----------- Statement Compiler -----------
 
-----------------------Helper----------------------
-
--- Put given string into code string
-putCode :: String -> State SymTable ()
-putCode str
-  = do
-      st <- get
-      let c = code st
-      put $ st { code = c ++ str }
-
--- Return position string from SourcePos
-putPosition :: SourcePos -> String
-putPosition pos
-  = let
-      line = sourceLine pos
-      column = sourceColumn pos
-    in
-      "Line " ++ show line ++ " Column " ++ show column ++ "\n"
-
-
------------ Statement Helper -----------
-
--- Put statements (recursion)
-putStatements :: [Stmt] -> State SymTable ()
-putStatements [] = return ()
-putStatements (stmt:stmts)
-  = do
-      putStatement stmt
-      putStatements stmts
-
--- Put statement into code string
-putStatement :: Stmt -> State SymTable ()
-putStatement stmt
-    = do
-        compileStmt stmt
-        -- Reset register
-        resetReg
-
--- Put statement comment into code string
-putStmtComment :: Stmt -> State SymTable ()
-putStmtComment stmt
-  = do
-      putCode $ "# " ++ compileStmtComment stmt ++ "\n"
-
--- Compile statement comment based on statement type
-compileStmtComment :: Stmt -> String
-compileStmtComment (Assign _ stmtVar expr)
-  = stmtVarToStr stmtVar ++ " := " ++ exprToStr False expr ++ ";"
-compileStmtComment (Read _ stmtVar)
-  = "read " ++ stmtVarToStr stmtVar ++ ";"
-compileStmtComment (Write _ expr)
-  = "write " ++ exprToStr False expr ++ ";"
-compileStmtComment (SWrite _ string)
-  = "write \"" ++ string ++ "\";"
-compileStmtComment (Call _ ident exprs)
-  = "call " ++ ident ++ "(" ++ exprsToStr exprs ++ ");"
-compileStmtComment (If _ expr _ _)
-  = "if " ++ exprToStr False expr
-compileStmtComment (While _ expr _)
-  = "while " ++ exprToStr False expr
-
--- Compile statements (recursion)
-compileStmts :: [Stmt] -> State SymTable ()
-compileStmts [] 
-  = do
-      resetReg 
-      return ()
-compileStmts (stmt:stmts)
-  = do
-      resetReg
-      compileStmt stmt
-      compileStmts stmts
-
-------------------------------------------------------------------------------
-
--- Return the base type of given statement variable
-getStmtVarBaseType :: StmtVar -> SourcePos -> State SymTable BaseType
--- Single variable case
-getStmtVarBaseType (SBaseVar ident) pos
-  = do
-      (_, btype, _, _) <- getVariable ident (Single) pos
-      return btype
--- Array or Matrix variable case
-getStmtVarBaseType (IndexVar ident index) pos
-  = do
-      (_, btype, _, _) <- getVariable ident (convertIndex2VarShape index) pos
-      return btype
-
--- Convert Index type into VarShape type
-convertIndex2VarShape :: Index -> VarShape
-convertIndex2VarShape (IArray _)    = (Array 0)
-convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0)
-
--- Check if two types can be assigned
--- Note: Float can be assigned by Int
-assignableType :: BaseType -> BaseType -> Int -> State SymTable Bool
-assignableType FloatType IntType reg
-  = do
-      -- Convert int to float type
-      putCode $ "    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n"
-      return True
-assignableType st ex reg
-  = do 
-      return (st == ex)
-
--- Put assignment code
-putAssignCode :: StmtVar -> Int -> SourcePos -> State SymTable ()
--- Variable case
-putAssignCode (SBaseVar ident) reg pos
-  = do
-      (isVal, _, _, slot) <- getVariable ident (Single) pos
-      if not isVal then
-        -- Call by reference
-        putAssignCodeRef slot reg
-      else
-        -- Call by value
-        -- Store assigned value into original slot
-        putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
--- Array case
-putAssignCode (IndexVar ident (IArray expr)) reg pos
-  = do
-      (_, _, _, slot) <- getVariable ident (Array 0) pos
-      offsetReg <- nextAvailableReg
-      exprType <- compileExpr offsetReg expr
-      -- Check if index is Int type
-      if exprType == IntType then
-        putAssignCodeOffset offsetReg slot reg
-      else
-        error $ putPosition pos ++ "Array index is not Int"
--- Matrix case
-putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg pos
-  = do
-      (_, _, (Matrix row col), slot) <- getVariable ident (Matrix 0 0) pos
-      offsetReg <- nextAvailableReg
-      colReg <- nextAvailableReg
-      expr1Type <- compileExpr offsetReg expr1
-      expr2Type <- compileExpr colReg expr2
-      -- Check if indexes are Int type
-      if expr1Type == IntType && expr2Type == IntType then
-        do
-          putSetOffsetReg offsetReg colReg col
-          putAssignCodeOffset offsetReg slot reg
-      else
-        error $ putPosition pos ++ "Matrix index is not Int"
-
--- Put calculation of offset register for Matrix
-putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
-putSetOffsetReg offsetReg colReg col
-  = do
-      sizeReg <- nextAvailableReg
-      -- Store column value into available register
-      putCode $  "    int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
-      -- Multiply with offset value into offset register
-      putCode $  "    mul_int r" ++ show offsetReg ++ ", r"
-              ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
-      -- Add column value into offset register
-      putCode $  "    add_int r" ++ show offsetReg ++ ", r"
-              ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
-
--- Put calculation of stack array's index
-putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
-putAssignCodeOffset offsetReg startSlot reg
-  = do
-      addrReg <- nextAvailableReg
-      -- TODO Load address 
-      putCode $  "    load_address r" ++ show addrReg ++ ", "
-              ++ show startSlot ++ "\n"
-      -- TODO Subtract
-      putCode $  "    sub_offset r" ++ show addrReg ++ ", r"
-              ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
-      -- TODO Store indirect
-      putCode $  "    store_indirect r" ++ show addrReg
-              ++ ", r" ++ show reg ++ "\n"
-
--- Put assignment code for Ref Indicator
-putAssignCodeRef :: Int -> Int -> State SymTable ()
-putAssignCodeRef addrSlot reg
-  = do
-      addrReg <- nextAvailableReg
-      -- TODO Load
-      putCode $  "    load r" ++ show addrReg ++ ", "
-              ++ show addrSlot ++ "\n"
-      -- TODO Store indirect
-      putCode $  "    store_indirect r" ++ show addrReg
-              ++ ", r" ++ show reg ++ "\n"
-
--- Put read instruction based on base type of variable
-putReadCodeType :: BaseType -> State SymTable ()
-putReadCodeType baseType
-  = do
-      let func = case baseType of
-                      BoolType  -> "read_bool\n"
-                      IntType   -> "read_int\n"
-                      FloatType -> "read_real\n"
-      -- Call built-in read function
-      putCode $ "    call_builtin " ++ func
-
----------------------------------------------------------------------------------------------------------------------
 -- Compile statement
 compileStmt :: Stmt -> State SymTable ()
 -- Assign statement
@@ -568,69 +391,181 @@ compileStmt (While pos expr stmts)
               ++ "Expression of While statement can not have type "
               ++ show exprType
 
-compileExprs :: String -> Int -> [Expr] -> State SymTable ()
-compileExprs _ _ [] = return ()
-compileExprs ident n (e:es)
+-- Compile statements (recursion)
+compileStmts :: [Stmt] -> State SymTable ()
+compileStmts [] 
   = do
-      let pos = getExprPos e
-      (isVal, baseType) <- getProcParameter ident n
-      if isVal then
-        -- Call by value
-        do
-          exprType <- compileExpr n e
-          setReg (n + 1)
-          if exprType == baseType then
-            do
-              n1 <- nextAvailableReg
-              compileExprs ident n1 es
-          else
-            if exprType == IntType && baseType == FloatType then 
-              do
-                -- Convert int to float type
-                putCode $  "    int_to_real r" ++ show n
-                        ++ ", r" ++ show n ++ "\n"
-                n1 <- nextAvailableReg
-                compileExprs ident n1 es
-            else error $ putPosition pos
-                      ++ " procedure parameter dose not match "
-      else
-        -- Call by reference
-        case e of
-          (Id _ stmtVar)
-            -> do
-                  stmtVarType <- getStmtVarBaseType stmtVar pos
-                  if stmtVarType == baseType then
-                    do
-                      storeAddressToRegN stmtVar n pos
-                      setReg (n + 1)
-                      n1 <- nextAvailableReg
-                      compileExprs ident n1 es
-                  else
-                    error $  putPosition pos
-                          ++ " procedure parameter dose not match"
-          _ -> error $ putPosition pos
-                    ++ " Ref procedure parameter dose not allow Non-lvalue"
+      resetReg 
+      return ()
+compileStmts (stmt:stmts)
+  = do
+      resetReg
+      compileStmt stmt
+      compileStmts stmts
 
--- Get position from given expression
-getExprPos :: Expr -> SourcePos
-getExprPos (Id pos _)             = pos
-getExprPos (BoolConst pos _)      = pos
-getExprPos (IntConst pos _)       = pos
-getExprPos (FloatConst pos _)     = pos
-getExprPos (Add pos _ _)          = pos
-getExprPos (Minus pos _ _)        = pos
-getExprPos (Mul pos _ _)          = pos
-getExprPos (Div pos _ _)          = pos
-getExprPos (Or pos _ _)           = pos
-getExprPos (And pos _ _)          = pos
-getExprPos (Equal pos _ _)        = pos
-getExprPos (NotEqual pos _ _)     = pos
-getExprPos (Less pos _ _)         = pos
-getExprPos (LessEqual pos _ _)    = pos
-getExprPos (Greater pos _ _)      = pos
-getExprPos (GreaterEqual pos _ _) = pos
-getExprPos (Neg pos _)            = pos
-getExprPos (UMinus pos _)         = pos
+----------- Statement Helper -----------
+
+-- Put statements (recursion)
+putStatements :: [Stmt] -> State SymTable ()
+putStatements [] = return ()
+putStatements (stmt:stmts)
+  = do
+      putStatement stmt
+      putStatements stmts
+
+-- Put statement into code string
+putStatement :: Stmt -> State SymTable ()
+putStatement stmt
+    = do
+        compileStmt stmt
+        -- Reset register
+        resetReg
+
+-- Put statement comment into code string
+putStmtComment :: Stmt -> State SymTable ()
+putStmtComment stmt
+  = do
+      putCode $ "# " ++ compileStmtComment stmt ++ "\n"
+
+-- Compile statement comment based on statement type
+compileStmtComment :: Stmt -> String
+compileStmtComment (Assign _ stmtVar expr)
+  = stmtVarToStr stmtVar ++ " := " ++ exprToStr False expr ++ ";"
+compileStmtComment (Read _ stmtVar)
+  = "read " ++ stmtVarToStr stmtVar ++ ";"
+compileStmtComment (Write _ expr)
+  = "write " ++ exprToStr False expr ++ ";"
+compileStmtComment (SWrite _ string)
+  = "write \"" ++ string ++ "\";"
+compileStmtComment (Call _ ident exprs)
+  = "call " ++ ident ++ "(" ++ exprsToStr exprs ++ ");"
+compileStmtComment (If _ expr _ _)
+  = "if " ++ exprToStr False expr
+compileStmtComment (While _ expr _)
+  = "while " ++ exprToStr False expr
+
+-- Return the base type of given statement variable
+getStmtVarBaseType :: StmtVar -> SourcePos -> State SymTable BaseType
+-- Single variable case
+getStmtVarBaseType (SBaseVar ident) pos
+  = do
+      (_, btype, _, _) <- getVariable ident (Single) pos
+      return btype
+-- Array or Matrix variable case
+getStmtVarBaseType (IndexVar ident index) pos
+  = do
+      (_, btype, _, _) <- getVariable ident (convertIndex2VarShape index) pos
+      return btype
+
+-- Convert Index type into VarShape type
+convertIndex2VarShape :: Index -> VarShape
+convertIndex2VarShape (IArray _)    = (Array 0)
+convertIndex2VarShape (IMatrix _ _) = (Matrix 0 0)
+
+-- Check if two types can be assigned
+-- Note: Float can be assigned by Int
+assignableType :: BaseType -> BaseType -> Int -> State SymTable Bool
+assignableType FloatType IntType reg
+  = do
+      -- Convert int to float type
+      putCode $ "    int_to_real r" ++ show reg ++ ", r" ++ show reg ++ "\n"
+      return True
+assignableType st ex reg
+  = do 
+      return (st == ex)
+
+-- Put assignment code
+putAssignCode :: StmtVar -> Int -> SourcePos -> State SymTable ()
+-- Variable case
+putAssignCode (SBaseVar ident) reg pos
+  = do
+      (isVal, _, _, slot) <- getVariable ident (Single) pos
+      if not isVal then
+        -- Call by reference
+        putAssignCodeRef slot reg
+      else
+        -- Call by value
+        -- Store assigned value into original slot
+        putCode $ "    store " ++ show slot ++ ", r" ++ show reg ++ "\n"
+-- Array case
+putAssignCode (IndexVar ident (IArray expr)) reg pos
+  = do
+      (_, _, _, slot) <- getVariable ident (Array 0) pos
+      offsetReg <- nextAvailableReg
+      exprType <- compileExpr offsetReg expr
+      -- Check if index is Int type
+      if exprType == IntType then
+        putAssignCodeOffset offsetReg slot reg
+      else
+        error $ putPosition pos ++ "Array index is not Int"
+-- Matrix case
+putAssignCode (IndexVar ident (IMatrix expr1 expr2)) reg pos
+  = do
+      (_, _, (Matrix row col), slot) <- getVariable ident (Matrix 0 0) pos
+      offsetReg <- nextAvailableReg
+      colReg <- nextAvailableReg
+      expr1Type <- compileExpr offsetReg expr1
+      expr2Type <- compileExpr colReg expr2
+      -- Check if indexes are Int type
+      if expr1Type == IntType && expr2Type == IntType then
+        do
+          putSetOffsetReg offsetReg colReg col
+          putAssignCodeOffset offsetReg slot reg
+      else
+        error $ putPosition pos ++ "Matrix index is not Int"
+
+-- Put calculation of offset register for Matrix
+putSetOffsetReg :: Int -> Int -> Int -> State SymTable ()
+putSetOffsetReg offsetReg colReg col
+  = do
+      sizeReg <- nextAvailableReg
+      -- Store column value into available register
+      putCode $  "    int_const r" ++ show sizeReg ++ ", " ++ show col ++ "\n"
+      -- Multiply with offset value into offset register
+      putCode $  "    mul_int r" ++ show offsetReg ++ ", r"
+              ++ show offsetReg ++ ", r" ++ show sizeReg ++ "\n"
+      -- Add column value into offset register
+      putCode $  "    add_int r" ++ show offsetReg ++ ", r"
+              ++ show offsetReg ++ ", r" ++ show colReg ++ "\n"
+
+-- Put calculation of stack array's index
+putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
+putAssignCodeOffset offsetReg startSlot reg
+  = do
+      addrReg <- nextAvailableReg
+      -- TODO Load address 
+      putCode $  "    load_address r" ++ show addrReg ++ ", "
+              ++ show startSlot ++ "\n"
+      -- TODO Subtract
+      putCode $  "    sub_offset r" ++ show addrReg ++ ", r"
+              ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
+      -- TODO Store indirect
+      putCode $  "    store_indirect r" ++ show addrReg
+              ++ ", r" ++ show reg ++ "\n"
+
+-- Put assignment code for Ref Indicator
+putAssignCodeRef :: Int -> Int -> State SymTable ()
+putAssignCodeRef addrSlot reg
+  = do
+      addrReg <- nextAvailableReg
+      -- TODO Load
+      putCode $  "    load r" ++ show addrReg ++ ", "
+              ++ show addrSlot ++ "\n"
+      -- TODO Store indirect
+      putCode $  "    store_indirect r" ++ show addrReg
+              ++ ", r" ++ show reg ++ "\n"
+
+-- Put read instruction based on base type of variable
+putReadCodeType :: BaseType -> State SymTable ()
+putReadCodeType baseType
+  = do
+      let func = case baseType of
+                      BoolType  -> "read_bool\n"
+                      IntType   -> "read_int\n"
+                      FloatType -> "read_real\n"
+      -- Call built-in read function
+      putCode $ "    call_builtin " ++ func
+
 
 storeAddressToRegN :: StmtVar -> Int -> SourcePos -> State SymTable ()
 storeAddressToRegN (SBaseVar ident) destReg pos
@@ -678,94 +613,7 @@ putStoreAddressCodeOffset offsetReg startSlot destReg
       putCode $  "    sub_offset r" ++ show destReg ++ ", r"
               ++ show destReg ++ ", r" ++ show offsetReg ++ "\n"
 
------------ Declartion Helper -----------
-
-putDeclarations :: [Decl] -> State SymTable ()
-putDeclarations [] = return ()
-putDeclarations ds
-  = do
-      ri <- nextAvailableReg
-      -- Initial int value 0 for declaration
-      putCode $ "    int_const r" ++ show ri ++ ", 0\n"
-      rf <- nextAvailableReg
-      -- Initial float value 0.0 for declaration
-      putCode $ "    real_const r" ++ show rf ++ ", 0.0\n"
-      putDeclarations' ri rf ds
-
-putDeclarations' :: Int -> Int -> [Decl] -> State SymTable ()
-putDeclarations' _ _ [] = return ()
-putDeclarations' ri rf (d:ds)
-  = do
-      let r = whichDeclReg ri rf d
-      putDeclaration' r d
-      putDeclarations' ri rf ds
-
-putDeclaration' :: Int -> Decl -> State SymTable ()
-putDeclaration' r (Decl pos baseType declVar)
-  = do
-      case declVar of
-        (DBaseVar ident)
-          -> do
-                putDeclComment (DBaseVar ident) baseType
-                slot <- nextAvailableSlot
-                insertVariable ident (True, baseType, Single, slot) pos
-                -- TODO Store
-                putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-        (ShapeVar ident shape)
-          -> case shape of
-              (SArray num)
-                -> do
-                      putDeclComment (ShapeVar ident (SArray num)) baseType
-                      slot <- nextAvailableSlot
-                      insertVariable ident (True, baseType, (Array num), slot) pos
-                      -- TODO Store
-                      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-                      putFilledSkipSlot r (num - 1)
-              (SMatrix row col)
-                -> do
-                      putDeclComment (ShapeVar ident (shape)) baseType
-                      slot <- nextAvailableSlot
-                      insertVariable ident (True, baseType, (Matrix row col), slot) pos
-                      -- TODO Store
-                      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-                      putFilledSkipSlot r (row * col - 1)
-
-putFilledSkipSlot :: Int -> Int -> State SymTable ()
-putFilledSkipSlot _ 0 = return ()
-putFilledSkipSlot r num
-  = do
-      slot <- nextAvailableSlot
-      -- TODO Store
-      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
-      putFilledSkipSlot r (num - 1)
-
--- Put declaration comment
-putDeclComment :: DeclVar -> BaseType -> State SymTable ()
-putDeclComment declVar baseType
-  = do
-      -- Base type string
-      let tStr = case baseType of
-                      IntType -> "int"
-                      BoolType -> "bool"
-                      FloatType -> "float"
-      -- Variable string
-      let iStr = case declVar of
-                      (DBaseVar ident)
-                        -> ident
-                      -- Array[n]
-                      (ShapeVar ident (SArray num))
-                        -> ident ++ "[" ++ show num ++ "]"
-                      -- Matrix[m,n]
-                      (ShapeVar ident (SMatrix row col))
-                        -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
-      putCode $ "# initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
-      return ()
-
-whichDeclReg :: Int -> Int -> Decl -> Int
-whichDeclReg ri rf (Decl _ baseType _)
-  = if baseType == FloatType then rf else ri
-
------------ Expression Helper -----------
+----------- Expression Compiler -----------
 
 -- Compile boolean constant expression
 -- Use int_const to store boolean value
@@ -984,6 +832,51 @@ compileExpr reg (Id pos (IndexVar ident (IMatrix expr1 expr2)))
           -> error $ putPosition pos
           ++ "Expect Array expression, while Matrix expression is given"
 
+compileExprs :: String -> Int -> [Expr] -> State SymTable ()
+compileExprs _ _ [] = return ()
+compileExprs ident n (e:es)
+  = do
+      let pos = getExprPos e
+      (isVal, baseType) <- getProcParameter ident n
+      if isVal then
+        -- Call by value
+        do
+          exprType <- compileExpr n e
+          setReg (n + 1)
+          if exprType == baseType then
+            do
+              n1 <- nextAvailableReg
+              compileExprs ident n1 es
+          else
+            if exprType == IntType && baseType == FloatType then 
+              do
+                -- Convert int to float type
+                putCode $  "    int_to_real r" ++ show n
+                        ++ ", r" ++ show n ++ "\n"
+                n1 <- nextAvailableReg
+                compileExprs ident n1 es
+            else error $ putPosition pos
+                      ++ " procedure parameter dose not match "
+      else
+        -- Call by reference
+        case e of
+          (Id _ stmtVar)
+            -> do
+                  stmtVarType <- getStmtVarBaseType stmtVar pos
+                  if stmtVarType == baseType then
+                    do
+                      storeAddressToRegN stmtVar n pos
+                      setReg (n + 1)
+                      n1 <- nextAvailableReg
+                      compileExprs ident n1 es
+                  else
+                    error $  putPosition pos
+                          ++ " procedure parameter dose not match"
+          _ -> error $ putPosition pos
+                    ++ " Ref procedure parameter dose not allow Non-lvalue"
+
+----------- Expression Helper -----------
+
 compileArithmetricExpr :: String -> Int -> Expr -> Expr
                        -> SourcePos -> State SymTable BaseType
 compileArithmetricExpr s reg expr1 expr2 pos
@@ -1120,6 +1013,114 @@ compileCompareExpr s reg expr1 expr2 pos
               error $  putPosition pos ++ "Can not compare" ++ s
                     ++ " with type " ++ show type1
                     ++ " and type " ++ show type2
+
+-- Get position from given expression
+getExprPos :: Expr -> SourcePos
+getExprPos (Id pos _)             = pos
+getExprPos (BoolConst pos _)      = pos
+getExprPos (IntConst pos _)       = pos
+getExprPos (FloatConst pos _)     = pos
+getExprPos (Add pos _ _)          = pos
+getExprPos (Minus pos _ _)        = pos
+getExprPos (Mul pos _ _)          = pos
+getExprPos (Div pos _ _)          = pos
+getExprPos (Or pos _ _)           = pos
+getExprPos (And pos _ _)          = pos
+getExprPos (Equal pos _ _)        = pos
+getExprPos (NotEqual pos _ _)     = pos
+getExprPos (Less pos _ _)         = pos
+getExprPos (LessEqual pos _ _)    = pos
+getExprPos (Greater pos _ _)      = pos
+getExprPos (GreaterEqual pos _ _) = pos
+getExprPos (Neg pos _)            = pos
+getExprPos (UMinus pos _)         = pos
+
+----------- Declartion Helper -----------
+
+putDeclarations :: [Decl] -> State SymTable ()
+putDeclarations [] = return ()
+putDeclarations ds
+  = do
+      ri <- nextAvailableReg
+      -- Initial int value 0 for declaration
+      putCode $ "    int_const r" ++ show ri ++ ", 0\n"
+      rf <- nextAvailableReg
+      -- Initial float value 0.0 for declaration
+      putCode $ "    real_const r" ++ show rf ++ ", 0.0\n"
+      putDeclarations' ri rf ds
+
+putDeclarations' :: Int -> Int -> [Decl] -> State SymTable ()
+putDeclarations' _ _ [] = return ()
+putDeclarations' ri rf (d:ds)
+  = do
+      let r = whichDeclReg ri rf d
+      putDeclaration' r d
+      putDeclarations' ri rf ds
+
+putDeclaration' :: Int -> Decl -> State SymTable ()
+putDeclaration' r (Decl pos baseType declVar)
+  = do
+      case declVar of
+        (DBaseVar ident)
+          -> do
+                putDeclComment (DBaseVar ident) baseType
+                slot <- nextAvailableSlot
+                insertVariable ident (True, baseType, Single, slot) pos
+                -- TODO Store
+                putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
+        (ShapeVar ident shape)
+          -> case shape of
+              (SArray num)
+                -> do
+                      putDeclComment (ShapeVar ident (SArray num)) baseType
+                      slot <- nextAvailableSlot
+                      insertVariable ident (True, baseType, (Array num), slot) pos
+                      -- TODO Store
+                      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
+                      putFilledSkipSlot r (num - 1)
+              (SMatrix row col)
+                -> do
+                      putDeclComment (ShapeVar ident (shape)) baseType
+                      slot <- nextAvailableSlot
+                      insertVariable ident (True, baseType, (Matrix row col), slot) pos
+                      -- TODO Store
+                      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
+                      putFilledSkipSlot r (row * col - 1)
+
+putFilledSkipSlot :: Int -> Int -> State SymTable ()
+putFilledSkipSlot _ 0 = return ()
+putFilledSkipSlot r num
+  = do
+      slot <- nextAvailableSlot
+      -- TODO Store
+      putCode $ "    store " ++ show slot ++ ", r" ++ show r ++ "\n"
+      putFilledSkipSlot r (num - 1)
+
+-- Put declaration comment
+putDeclComment :: DeclVar -> BaseType -> State SymTable ()
+putDeclComment declVar baseType
+  = do
+      -- Base type string
+      let tStr = case baseType of
+                      IntType -> "int"
+                      BoolType -> "bool"
+                      FloatType -> "float"
+      -- Variable string
+      let iStr = case declVar of
+                      (DBaseVar ident)
+                        -> ident
+                      -- Array[n]
+                      (ShapeVar ident (SArray num))
+                        -> ident ++ "[" ++ show num ++ "]"
+                      -- Matrix[m,n]
+                      (ShapeVar ident (SMatrix row col))
+                        -> ident ++ "[" ++ show row ++ "," ++ show col ++ "]"
+      putCode $ "# initialise " ++ tStr ++ " val " ++ iStr ++ "\n"
+      return ()
+
+whichDeclReg :: Int -> Int -> Decl -> Int
+whichDeclReg ri rf (Decl _ baseType _)
+  = if baseType == FloatType then rf else ri
 
 ----------- Parameters Helper -----------
 

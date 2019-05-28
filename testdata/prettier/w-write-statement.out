@@ -1,0 +1,3 @@
+Syntax error: "./testdata/prettier/w-write-statement.goat" (line 3, column 7):
+unexpected if
+expecting string literal or expression

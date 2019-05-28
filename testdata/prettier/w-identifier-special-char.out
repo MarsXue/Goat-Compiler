@@ -1,0 +1,2 @@
+Syntax error: "./testdata/prettier/w-identifier-special-char.goat" (line 3, column 5):
+unexpected unknown token: "$"
