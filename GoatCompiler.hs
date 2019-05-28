@@ -327,7 +327,7 @@ compileStmt (If pos expr stmts [])
       exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
-          -- TODO branch_on_false
+          -- Add code for branch on false
           putCode $ "    branch_on_false r0, label_" ++ show afterThen ++ "\n"
           putCode $ "# then\n"
           compileStmts stmts
@@ -349,11 +349,11 @@ compileStmt (If pos expr thenStmts elseStmts)
       exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
-          -- TODO branch_on_false
+          -- Add code for branch on false
           putCode $ "    branch_on_false r0, label_" ++ show inElse ++ "\n"
           putCode $ "# then\n"
           compileStmts thenStmts
-          -- TODO branch_uncond
+          -- Add code for branch uncond
           putCode $ "    branch_uncond label_" ++ show afterElse ++ "\n"
           putCode $ "label_" ++ show inElse ++ ":\n"
           putCode $ "# else\n"
@@ -377,11 +377,11 @@ compileStmt (While pos expr stmts)
       exprType <- compileExpr reg expr
       if exprType == BoolType then
         do
-          -- TODO branch_on_false
+          -- Add code for branch on false
           putCode $ "    branch_on_false r0, label_" ++ show afterWhile ++ "\n"
           putCode $ "# do\n"
           compileStmts stmts
-          -- TODO branch_uncond
+          -- Add code for branch uncond
           putCode $ "    branch_uncond label_" ++ show inWhile ++ "\n"
           putCode $ "# od\n"
           -- Add label for branch_on_false
@@ -533,13 +533,13 @@ putAssignCodeOffset :: Int -> Int -> Int -> State SymTable ()
 putAssignCodeOffset offsetReg startSlot reg
   = do
       addrReg <- nextAvailableReg
-      -- TODO Load address 
+      -- Load address of start slot
       putCode $  "    load_address r" ++ show addrReg ++ ", "
               ++ show startSlot ++ "\n"
-      -- TODO Subtract
+      -- Subtract address with offset
       putCode $  "    sub_offset r" ++ show addrReg ++ ", r"
               ++ show addrReg ++ ", r" ++ show offsetReg ++ "\n"
-      -- TODO Store indirect
+      -- Store indirect to address 
       putCode $  "    store_indirect r" ++ show addrReg
               ++ ", r" ++ show reg ++ "\n"
 
@@ -548,10 +548,10 @@ putAssignCodeRef :: Int -> Int -> State SymTable ()
 putAssignCodeRef addrSlot reg
   = do
       addrReg <- nextAvailableReg
-      -- TODO Load
+      -- Load address to register
       putCode $  "    load r" ++ show addrReg ++ ", "
               ++ show addrSlot ++ "\n"
-      -- TODO Store indirect
+      -- Store indirect to address 
       putCode $  "    store_indirect r" ++ show addrReg
               ++ ", r" ++ show reg ++ "\n"
 
@@ -573,10 +573,10 @@ storeAddressToRegN (SBaseVar ident) destReg pos
   = do
       (isVal, _, _, slot) <- getVariable ident (Single) pos
       if not isVal then
-        -- TODO
+        -- Load slot number to register
         putCode $ "    load r" ++ show destReg ++ ", " ++ show slot ++ "\n"
       else
-        -- TODO
+        -- Load address to register
         putCode $  "    load_address r" ++ show destReg
                 ++ ", " ++ show slot ++ "\n"
 -- Case of the variable is array
@@ -608,10 +608,10 @@ storeAddressToRegN (IndexVar ident (IMatrix expr1 expr2)) destReg pos
 putStoreAddressCodeOffset :: Int -> Int -> Int -> State SymTable ()
 putStoreAddressCodeOffset offsetReg startSlot destReg
   = do
-      -- TODO Load address
+      -- Load address of start slot
       putCode $  "    load_address r" ++ show destReg
               ++ ", " ++ show startSlot ++ "\n"
-      -- TODO Calculate the offset
+      -- Calculate the offset
       putCode $  "    sub_offset r" ++ show destReg ++ ", r"
               ++ show destReg ++ ", r" ++ show offsetReg ++ "\n"
 
@@ -624,21 +624,21 @@ compileExpr :: Int -> Expr -> State SymTable BaseType
 compileExpr reg (BoolConst _ bool)
   = do
       let boolInt = if bool then 1 else 0
-      -- TODO 
+      -- make bool constant
       putCode $ "    int_const r" ++ show reg ++ ", " ++ show boolInt ++ "\n"
       return BoolType
 
 -- Compile integer constant expression
 compileExpr reg (IntConst _ i)
   = do
-      -- TODO
+      -- make int constant
       putCode $ "    int_const r" ++ show reg ++ ", " ++ show i ++ "\n"
       return IntType
 
 -- Compile float constant expression
 compileExpr reg (FloatConst _ f)
   = do
-      -- TODO
+      -- make flost constant
       putCode $ "    real_const r" ++ show reg ++ ", " ++ show f ++ "\n"
       return FloatType
 
@@ -664,12 +664,12 @@ compileExpr reg (Div pos expr1 expr2)
 
 -- Compile binary or operation expression
 compileExpr reg (Or pos expr1 expr2)
-  -- TODO or
+  -- or
   = compileLogicalExpr "or" "true" reg expr1 expr2 pos
 
 -- Compile binary and operation expression
 compileExpr reg (And pos expr1 expr2)
-  -- TODO and
+  -- and
   = compileLogicalExpr "and" "false" reg expr1 expr2 pos
 
 -- Compile binary equal operation expression
@@ -774,10 +774,10 @@ compileExpr reg (Id pos (IndexVar ident (IArray expr)))
                     -- Load address from slot into register
                     putCode $  "    load_address r" ++ show reg ++ ", "
                             ++ show slot ++ "\n"
-                    -- TODO
+                    -- Calculate address using offset
                     putCode $  "    sub_offset r" ++ show reg ++ ", r"
                             ++ show reg ++ ", r" ++ show reg1 ++ "\n"
-                    -- TODO
+                    -- Load value indirectly to address 
                     putCode $  "    load_indirect r" ++ show reg ++ ", r"
                             ++ show reg ++ "\n"
                     return baseType
