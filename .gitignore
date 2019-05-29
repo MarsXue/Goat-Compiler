@@ -4,6 +4,8 @@
 # Execute file
 Goat
 
+testdata/compiler/*.oz
+
 ### Haskell ###
 dist
 dist-*

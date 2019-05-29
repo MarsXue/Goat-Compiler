@@ -1,7 +1,7 @@
 -----------------------------------------------------------
 -- COMP90045 Programming Language Implementation Project --
 --                     Goat Compiler                     --
--- Implemented by Shjie Liu, Wenqing Xue, Minjian Chen   --
+--  Implemented by Shjie Liu, Wenqing Xue, Minjian Chen  --
 -----------------------------------------------------------
 
 -- Goat Pretty Printer
