@@ -6,9 +6,9 @@
 A compiler implementation for translating Goat language to Oz code.
 
 ## Team
-Minjian Chen
-Shijie Liu
-Wenqing Xue
+Minjian Chen  
+Shijie Liu  
+Wenqing Xue  
 
 ## Usage
 ```
